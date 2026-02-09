@@ -1,8 +1,10 @@
-import { Package, Task, Template } from '../types';
+import { Package, Task, Template, DEFAULT_TASK_STATUS } from '../types';
 import { generateId } from './idGenerator';
 
 /**
- * Calculates the due date for a task based on expected start date and lead review time
+ * Calculates the due date for a task from the package's expected start date.
+ * - If the task has no lead time: due date = start date.
+ * - If the task has lead time (days): due date = start date minus that many days.
  */
 export const calculateDueDate = (expectedStartDate: string, leadReviewTime?: number): string => {
   if (leadReviewTime !== undefined && leadReviewTime > 0) {
@@ -48,6 +50,7 @@ export const addNewTasksToPackage = (
           completed: false,
           dueDate: calculateDueDate(pkg.expectedStartDate, templateTask.leadReviewTime),
           leadReviewTime: templateTask.leadReviewTime,
+          status: DEFAULT_TASK_STATUS,
         };
         tasksToAdd.push(newTask);
       }

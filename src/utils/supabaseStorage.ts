@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { AppData, Template, Package, Category, Task } from '../types';
+import { AppData, Template, Package, Category, Task, DEFAULT_TASK_STATUS } from '../types';
 
 /**
  * Load all data from Supabase
@@ -79,6 +79,7 @@ export const loadData = async (): Promise<AppData> => {
           completedDate: t.completed_date ? new Date(t.completed_date).toISOString() : undefined,
           dueDate: t.due_date || undefined,
           leadReviewTime: t.lead_review_time || undefined,
+          status: (t.status || DEFAULT_TASK_STATUS) as Task['status'],
         }));
 
       return {
@@ -112,6 +113,7 @@ export const loadData = async (): Promise<AppData> => {
           completedDate: t.completed_date ? new Date(t.completed_date).toISOString() : undefined,
           dueDate: t.due_date || undefined,
           leadReviewTime: t.lead_review_time || undefined,
+          status: (t.status || DEFAULT_TASK_STATUS) as Task['status'],
         }));
 
       return {
@@ -189,6 +191,7 @@ export const saveTemplate = async (template: Template): Promise<void> => {
         completed_date: task.completedDate ? new Date(task.completedDate).toISOString() : null,
         due_date: task.dueDate || null,
         lead_review_time: task.leadReviewTime || null,
+        status: task.status || DEFAULT_TASK_STATUS,
         template_id: template.id,
         package_id: null,
       }));
@@ -258,13 +261,9 @@ export const savePackage = async (pkg: Package): Promise<void> => {
 
     if (packageError) throw packageError;
 
-    // Delete existing categories and tasks for this package
-    await supabase.from('categories').delete().eq('package_id', pkg.id);
-    await supabase.from('tasks').delete().eq('package_id', pkg.id);
-
-    // Insert categories
+    // Upsert categories first (never delete all before insert - avoids data loss if insert fails)
     if (pkg.categories.length > 0) {
-      const categoriesToInsert = pkg.categories.map(cat => ({
+      const categoriesToUpsert = pkg.categories.map(cat => ({
         id: cat.id,
         name: cat.name,
         color: cat.color,
@@ -274,14 +273,25 @@ export const savePackage = async (pkg: Package): Promise<void> => {
 
       const { error: categoriesError } = await supabase
         .from('categories')
-        .insert(categoriesToInsert);
+        .upsert(categoriesToUpsert, { onConflict: 'id' });
 
       if (categoriesError) throw categoriesError;
     }
 
-    // Insert tasks
+    // Remove categories that are no longer in the package
+    const currentCategoryIds = new Set(pkg.categories.map(c => c.id));
+    const { data: existingCategories } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('package_id', pkg.id);
+    const toRemoveCategories = (existingCategories || []).filter((c: { id: string }) => !currentCategoryIds.has(c.id));
+    for (const c of toRemoveCategories) {
+      await supabase.from('categories').delete().eq('id', (c as { id: string }).id);
+    }
+
+    // Upsert tasks (never delete all before insert - avoids data loss if insert fails)
     if (pkg.tasks.length > 0) {
-      const tasksToInsert = pkg.tasks.map(task => ({
+      const tasksToUpsert = pkg.tasks.map(task => ({
         id: task.id,
         name: task.name,
         description: task.description || null,
@@ -290,15 +300,27 @@ export const savePackage = async (pkg: Package): Promise<void> => {
         completed_date: task.completedDate ? new Date(task.completedDate).toISOString() : null,
         due_date: task.dueDate || null,
         lead_review_time: task.leadReviewTime || null,
+        status: task.status || DEFAULT_TASK_STATUS,
         template_id: null,
         package_id: pkg.id,
       }));
 
       const { error: tasksError } = await supabase
         .from('tasks')
-        .insert(tasksToInsert);
+        .upsert(tasksToUpsert, { onConflict: 'id' });
 
       if (tasksError) throw tasksError;
+    }
+
+    // Remove tasks that are no longer in the package
+    const currentTaskIds = new Set(pkg.tasks.map(t => t.id));
+    const { data: existingTasks } = await supabase
+      .from('tasks')
+      .select('id')
+      .eq('package_id', pkg.id);
+    const toRemoveTasks = (existingTasks || []).filter((t: { id: string }) => !currentTaskIds.has(t.id));
+    for (const t of toRemoveTasks) {
+      await supabase.from('tasks').delete().eq('id', (t as { id: string }).id);
     }
   } catch (error) {
     console.error('Error saving package to Supabase:', error);

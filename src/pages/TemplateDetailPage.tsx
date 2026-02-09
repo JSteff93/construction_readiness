@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Template, Category, Task, Package } from '../types';
+import { Template, Category, Task, Package, DEFAULT_TASK_STATUS } from '../types';
 import { loadData, saveTemplate, savePackage } from '../utils/storage';
 import { generateId } from '../utils/idGenerator';
 import { findNewTasks, addNewTasksToPackage } from '../utils/packageUtils';
 import PackageSelectionModal from '../components/PackageSelectionModal';
+import LoadingBulldozer from '../components/LoadingBulldozer';
 
 const CATEGORY_COLORS = [
   '#667eea', '#764ba2', '#f093fb', '#4facfe', '#00f2fe',
@@ -36,27 +37,33 @@ export default function TemplateDetailPage() {
   const [packagesUsingTemplate, setPackagesUsingTemplate] = useState<Package[]>([]);
   const [selectedPackageIds, setSelectedPackageIds] = useState<Set<string>>(new Set());
   const [newTasksToAdd, setNewTasksToAdd] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
-      const data = await loadData();
-      
-      if (isNew) {
-        // Load available templates for duplication
-        setAvailableTemplates(data.templates);
-      } else if (id) {
-        const found = data.templates.find(t => t.id === id);
-        if (found) {
-          // Store a deep copy of the original template for comparison
-          setOriginalTemplate(JSON.parse(JSON.stringify(found)));
-          setTemplate(found);
-          
-          // Find packages using this template
-          const packages = data.packages.filter(p => p.templateId === id);
-          setPackagesUsingTemplate(packages);
-        } else {
-          navigate('/templates');
+      setLoading(true);
+      try {
+        const data = await loadData();
+
+        if (isNew) {
+          // Load available templates for duplication
+          setAvailableTemplates(data.templates);
+        } else if (id) {
+          const found = data.templates.find(t => t.id === id);
+          if (found) {
+            // Store a deep copy of the original template for comparison
+            setOriginalTemplate(JSON.parse(JSON.stringify(found)));
+            setTemplate(found);
+
+            // Find packages using this template
+            const packages = data.packages.filter(p => p.templateId === id);
+            setPackagesUsingTemplate(packages);
+          } else {
+            navigate('/templates');
+          }
         }
+      } finally {
+        setLoading(false);
       }
     };
     fetchData();
@@ -193,6 +200,7 @@ export default function TemplateDetailPage() {
       categoryId,
       completed: false,
       leadReviewTime,
+      status: DEFAULT_TASK_STATUS,
     };
     
     setTemplate({
@@ -285,8 +293,9 @@ export default function TemplateDetailPage() {
       ...task,
       id: generateId(),
       categoryId: categoryIdMap.get(task.categoryId) || task.categoryId,
-      completed: false, // Reset completed status
-      completedDate: undefined, // Remove completed date
+      completed: false,
+      completedDate: undefined,
+      status: DEFAULT_TASK_STATUS,
     }));
 
     setTemplate({
@@ -304,6 +313,22 @@ export default function TemplateDetailPage() {
     category,
     tasks: template.tasks.filter(t => t.categoryId === category.id),
   }));
+
+  if (loading) {
+    return (
+      <div>
+        <div className="page-header">
+          <Link to="/templates" style={{ color: '#667eea', textDecoration: 'none', marginBottom: '0.5rem', display: 'block' }}>
+            ← Back to Templates
+          </Link>
+        </div>
+        <div className="page-loading">
+          <LoadingBulldozer />
+          <span className="page-loading-text">Loading template…</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>

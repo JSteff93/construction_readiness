@@ -4,6 +4,18 @@ export interface Category {
   color: string;
 }
 
+export const TASK_STATUSES = [
+  'Pending',
+  'In Progress',
+  'Waiting',
+  'Complete',
+  'Delegated',
+] as const;
+
+export type TaskStatus = (typeof TASK_STATUSES)[number];
+
+export const DEFAULT_TASK_STATUS: TaskStatus = 'Pending';
+
 export interface Task {
   id: string;
   name: string;
@@ -13,6 +25,7 @@ export interface Task {
   completedDate?: string;
   dueDate?: string;
   leadReviewTime?: number; // in days
+  status?: TaskStatus;
 }
 
 export interface Template {

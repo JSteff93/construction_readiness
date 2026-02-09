@@ -36,6 +36,11 @@ export const formatDate = (date: string): string => {
   return format(new Date(date), 'MMM dd, yyyy');
 };
 
+/** Short format: dd Mmm yy (e.g. 31 Jan 25) */
+export const formatDateShort = (date: string): string => {
+  return format(new Date(date), 'dd MMM yy');
+};
+
 export const getCountdownColor = (targetDate: string): string => {
   const days = getDaysUntil(targetDate);
   

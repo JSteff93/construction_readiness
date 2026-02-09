@@ -2,18 +2,25 @@ import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Template } from '../types';
 import { loadData, deleteTemplate, saveTemplate } from '../utils/storage';
+import LoadingBulldozer from '../components/LoadingBulldozer';
 import { formatDate } from '../utils/dateUtils';
 import { downloadTemplateAsExcel, downloadBlankTemplate, parseExcelToTemplate } from '../utils/excelUtils';
 
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchData = async () => {
-      const data = await loadData();
-      setTemplates(data.templates);
+      setLoading(true);
+      try {
+        const data = await loadData();
+        setTemplates(data.templates);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchData();
   }, []);
@@ -122,7 +129,12 @@ export default function TemplatesPage() {
         </div>
       </div>
 
-      {templates.length === 0 ? (
+      {loading ? (
+        <div className="page-loading">
+          <LoadingBulldozer />
+          <span className="page-loading-text">Loading templates…</span>
+        </div>
+      ) : templates.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">📋</div>
           <h2 className="empty-state-title">No Templates Yet</h2>
