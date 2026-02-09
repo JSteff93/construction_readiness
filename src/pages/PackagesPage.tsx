@@ -1,19 +1,54 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Package } from '../types';
-import { loadData, deletePackage } from '../utils/storage';
+import { Package, TaskStatus, TASK_STATUSES, DEFAULT_TASK_STATUS } from '../types';
+import { loadData, deletePackage, savePackage } from '../utils/storage';
+import LoadingBulldozer from '../components/LoadingBulldozer';
 import { getCountdownText, getCountdownColor, formatDate } from '../utils/dateUtils';
+
+const STATUS_COLORS: Record<TaskStatus, { bg: string; border: string; text: string }> = {
+  Pending: { bg: '#f1f5f9', border: '#94a3b8', text: '#475569' },
+  'In Progress': { bg: '#dbeafe', border: '#3b82f6', text: '#1d4ed8' },
+  Waiting: { bg: '#fef3c7', border: '#f59e0b', text: '#b45309' },
+  Complete: { bg: '#d1fae5', border: '#10b981', text: '#047857' },
+  Delegated: { bg: '#ede9fe', border: '#8b5cf6', text: '#5b21b6' },
+};
 
 export default function PackagesPage() {
   const [packages, setPackages] = useState<Package[]>([]);
   const [expandedPackageId, setExpandedPackageId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [openStatusTaskId, setOpenStatusTaskId] = useState<string | null>(null);
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const fetchData = async () => {
-      const data = await loadData();
-      setPackages(data.packages);
+    const handleClickOutside = (e: MouseEvent) => {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(e.target as Node)) {
+        setOpenStatusTaskId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const fetchData = async (showLoading = true) => {
+      if (showLoading) setLoading(true);
+      try {
+        const data = await loadData();
+        setPackages(data.packages);
+      } finally {
+        if (showLoading) setLoading(false);
+      }
     };
     fetchData();
+  }, []);
+
+  useEffect(() => {
+    const handleFocus = () => {
+      loadData().then((data) => setPackages(data.packages));
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
   const handleDelete = async (id: string) => {
@@ -44,6 +79,30 @@ export default function PackagesPage() {
     }));
   };
 
+  const getTaskStatus = (task: { status?: TaskStatus }) =>
+    task.status && TASK_STATUSES.includes(task.status) ? task.status : DEFAULT_TASK_STATUS;
+
+  const handleTaskStatusChange = async (pkg: Package, taskId: string, newStatus: TaskStatus) => {
+    const updatedTasks = pkg.tasks.map(t => {
+      if (t.id !== taskId) return t;
+      const isComplete = newStatus === 'Complete';
+      return {
+        ...t,
+        status: newStatus,
+        completed: isComplete,
+        completedDate: isComplete ? new Date().toISOString() : undefined,
+      };
+    });
+    const updatedPackage = { ...pkg, tasks: updatedTasks };
+    setPackages(packages.map(p => (p.id === pkg.id ? updatedPackage : p)));
+    try {
+      await savePackage(updatedPackage);
+    } catch (error) {
+      alert('Error updating status: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      setPackages(packages);
+    }
+  };
+
   return (
     <div>
       <div className="page-header">
@@ -53,7 +112,12 @@ export default function PackagesPage() {
         </Link>
       </div>
 
-      {packages.length === 0 ? (
+      {loading ? (
+        <div className="page-loading">
+          <LoadingBulldozer />
+          <span className="page-loading-text">Loading packages…</span>
+        </div>
+      ) : packages.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">📦</div>
           <h2 className="empty-state-title">No Packages Yet</h2>
@@ -224,6 +288,7 @@ export default function PackagesPage() {
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                                         {tasks.map(task => {
                                           const taskDueDate = task.dueDate || pkg.expectedStartDate;
+                                          const status = getTaskStatus(task);
                                           return (
                                             <div
                                               key={task.id}
@@ -259,7 +324,92 @@ export default function PackagesPage() {
                                                   </div>
                                                 )}
                                               </div>
-                                              <div style={{ fontSize: '0.65rem', color: '#6b7280', whiteSpace: 'nowrap', marginLeft: '0.5rem' }}>
+                                              <div
+                                                ref={openStatusTaskId === task.id ? statusDropdownRef : undefined}
+                                                style={{ position: 'relative' }}
+                                                onClick={(e) => e.stopPropagation()}
+                                              >
+                                                <button
+                                                  type="button"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setOpenStatusTaskId(openStatusTaskId === task.id ? null : task.id);
+                                                  }}
+                                                  style={{
+                                                    fontSize: '0.7rem',
+                                                    fontWeight: 500,
+                                                    padding: '0.3rem 0.6rem',
+                                                    borderRadius: '6px',
+                                                    border: `2px solid ${STATUS_COLORS[status].border}`,
+                                                    backgroundColor: STATUS_COLORS[status].bg,
+                                                    color: STATUS_COLORS[status].text,
+                                                    cursor: 'pointer',
+                                                    minWidth: '110px',
+                                                    textAlign: 'left',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    gap: '0.35rem',
+                                                  }}
+                                                >
+                                                  {status}
+                                                  <span style={{ fontSize: '0.6rem', opacity: 0.8 }}>
+                                                    {openStatusTaskId === task.id ? '▲' : '▼'}
+                                                  </span>
+                                                </button>
+                                                {openStatusTaskId === task.id && (
+                                                  <div
+                                                    style={{
+                                                      position: 'absolute',
+                                                      top: '100%',
+                                                      left: 0,
+                                                      marginTop: '2px',
+                                                      zIndex: 10,
+                                                      minWidth: '100%',
+                                                      borderRadius: '6px',
+                                                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                                      backgroundColor: 'white',
+                                                      border: '1px solid #e5e7eb',
+                                                      overflow: 'hidden',
+                                                    }}
+                                                  >
+                                                    {TASK_STATUSES.map((s) => (
+                                                      <button
+                                                        key={s}
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          handleTaskStatusChange(pkg, task.id, s);
+                                                          setOpenStatusTaskId(null);
+                                                        }}
+                                                        style={{
+                                                          display: 'block',
+                                                          width: '100%',
+                                                          fontSize: '0.7rem',
+                                                          fontWeight: 500,
+                                                          padding: '0.35rem 0.6rem',
+                                                          border: 'none',
+                                                          borderBottom: s !== TASK_STATUSES[TASK_STATUSES.length - 1] ? '1px solid #e5e7eb' : undefined,
+                                                          backgroundColor: s === status ? STATUS_COLORS[s].bg : 'white',
+                                                          color: STATUS_COLORS[s].text,
+                                                          cursor: 'pointer',
+                                                          textAlign: 'left',
+                                                          transition: 'background-color 0.15s',
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                          if (s !== status) e.currentTarget.style.backgroundColor = STATUS_COLORS[s].bg + '80';
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                          if (s !== status) e.currentTarget.style.backgroundColor = 'white';
+                                                        }}
+                                                      >
+                                                        {s}
+                                                      </button>
+                                                    ))}
+                                                  </div>
+                                                )}
+                                              </div>
+                                              <div style={{ fontSize: '0.65rem', color: '#6b7280', whiteSpace: 'nowrap', marginLeft: '0.25rem' }}>
                                                 Due: {formatDate(taskDueDate)}
                                               </div>
                                             </div>

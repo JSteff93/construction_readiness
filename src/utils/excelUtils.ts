@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { Template, Category, Task } from '../types';
+import { Template, Category, Task, DEFAULT_TASK_STATUS } from '../types';
 import { generateId } from './idGenerator';
 
 const CATEGORY_COLORS = [
@@ -192,6 +192,7 @@ export const parseExcelToTemplate = (file: File): Promise<Template> => {
             categoryId: category.id,
             completed: false,
             leadReviewTime: leadTime && !isNaN(leadTime) ? leadTime : undefined,
+            status: DEFAULT_TASK_STATUS,
           };
 
           tasks.push(task);

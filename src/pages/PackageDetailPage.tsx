@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Package, Template, Task } from '../types';
+import { Package, Template, Task, DEFAULT_TASK_STATUS } from '../types';
 import { loadData, savePackage } from '../utils/storage';
 import { getCountdownText, getCountdownColor, formatDate } from '../utils/dateUtils';
 import { generateId } from '../utils/idGenerator';
+import LoadingBulldozer from '../components/LoadingBulldozer';
 
 export default function PackageDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -18,40 +19,46 @@ export default function PackageDetailPage() {
   const [newTaskDescription, setNewTaskDescription] = useState<string>('');
   const [newTaskLeadReviewTime, setNewTaskLeadReviewTime] = useState<string>('');
   const [previousExpectedStartDate, setPreviousExpectedStartDate] = useState<string>('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
-      const data = await loadData();
-      setTemplates(data.templates);
-      
-      if (isNew) {
-        // Initialize new package
-        const initialDate = new Date().toISOString().split('T')[0];
-        setPackage({
-          id: `pkg-${Date.now()}`,
-          name: '',
-          description: '',
-          templateId: '',
-          expectedStartDate: initialDate,
-          tasks: [],
-          categories: [],
-          createdAt: new Date().toISOString(),
-        });
-        setPreviousExpectedStartDate(initialDate);
-      } else if (id) {
-        const found = data.packages.find(p => p.id === id);
-        if (found) {
-          // Ensure all tasks have dueDate set
-          const tasksWithDueDate = found.tasks.map(t => ({
-            ...t,
-            dueDate: t.dueDate || calculateDueDate(found.expectedStartDate, t.leadReviewTime),
-          }));
-          setPackage({ ...found, tasks: tasksWithDueDate });
-          setSelectedTemplateId(found.templateId);
-          setPreviousExpectedStartDate(found.expectedStartDate);
-        } else {
-          navigate('/');
+      setLoading(true);
+      try {
+        const data = await loadData();
+        setTemplates(data.templates);
+
+        if (isNew) {
+          // Initialize new package
+          const initialDate = new Date().toISOString().split('T')[0];
+          setPackage({
+            id: `pkg-${Date.now()}`,
+            name: '',
+            description: '',
+            templateId: '',
+            expectedStartDate: initialDate,
+            tasks: [],
+            categories: [],
+            createdAt: new Date().toISOString(),
+          });
+          setPreviousExpectedStartDate(initialDate);
+        } else if (id) {
+          const found = data.packages.find(p => p.id === id);
+          if (found) {
+            // Ensure all tasks have dueDate set
+            const tasksWithDueDate = found.tasks.map(t => ({
+              ...t,
+              dueDate: t.dueDate || calculateDueDate(found.expectedStartDate, t.leadReviewTime),
+            }));
+            setPackage({ ...found, tasks: tasksWithDueDate });
+            setSelectedTemplateId(found.templateId);
+            setPreviousExpectedStartDate(found.expectedStartDate);
+          } else {
+            navigate('/');
+          }
         }
+      } finally {
+        setLoading(false);
       }
     };
     fetchData();
@@ -68,10 +75,17 @@ export default function PackageDetailPage() {
 
   const handleExpectedStartDateChange = (newDate: string) => {
     if (!pkg) return;
-    
-    // During new package creation, never show confirmation dialog
+
+    // During new package creation: always recalculate task due dates from the new start date
     if (isNew) {
-      setPackage({ ...pkg, expectedStartDate: newDate });
+      const tasksWithDueDates =
+        pkg.tasks.length > 0
+          ? pkg.tasks.map(t => ({
+              ...t,
+              dueDate: calculateDueDate(newDate, t.leadReviewTime),
+            }))
+          : pkg.tasks;
+      setPackage({ ...pkg, expectedStartDate: newDate, tasks: tasksWithDueDates });
       setPreviousExpectedStartDate(newDate);
       return;
     }
@@ -134,6 +148,7 @@ export default function PackageDetailPage() {
           completed: false,
           dueDate: calculateDueDate(expectedStartDate, t.leadReviewTime),
           leadReviewTime: t.leadReviewTime,
+          status: DEFAULT_TASK_STATUS,
         };
       });
 
@@ -208,6 +223,7 @@ export default function PackageDetailPage() {
       completed: false,
       dueDate,
       leadReviewTime,
+      status: DEFAULT_TASK_STATUS,
     };
     
     setPackage({
@@ -272,8 +288,23 @@ export default function PackageDetailPage() {
   };
 
   if (isNew) {
-    if (!pkg) return <div>Loading...</div>;
-    
+    if (loading || !pkg) {
+      return (
+        <div>
+          <div className="page-header">
+            <Link to="/" style={{ color: '#667eea', textDecoration: 'none', marginBottom: '0.5rem', display: 'block' }}>
+              ← Back to Packages
+            </Link>
+            <h1 className="page-title">Create Package</h1>
+          </div>
+          <div className="page-loading">
+            <LoadingBulldozer />
+            <span className="page-loading-text">Loading…</span>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div>
         <div className="page-header">
@@ -347,6 +378,21 @@ export default function PackageDetailPage() {
     );
   }
 
+  if (loading) {
+    return (
+      <div>
+        <div className="page-header">
+          <Link to="/" style={{ color: '#667eea', textDecoration: 'none', marginBottom: '0.5rem', display: 'block' }}>
+            ← Back to Packages
+          </Link>
+        </div>
+        <div className="page-loading">
+          <LoadingBulldozer />
+          <span className="page-loading-text">Loading package…</span>
+        </div>
+      </div>
+    );
+  }
   if (!pkg) return null;
 
   const countdownColor = getCountdownColor(pkg.expectedStartDate);
