@@ -8,8 +8,8 @@ import PackageSelectionModal from '../components/PackageSelectionModal';
 import LoadingBulldozer from '../components/LoadingBulldozer';
 
 const CATEGORY_COLORS = [
-  '#667eea', '#764ba2', '#f093fb', '#4facfe', '#00f2fe',
-  '#43e97b', '#fa709a', '#fee140', '#30cfd0', '#330867'
+  '#14532d', '#166534', '#15803d', '#16a34a', '#22c55e',
+  '#4ade80', '#86efac', '#bbf7d0', '#052e16', '#14532d'
 ];
 
 export default function TemplateDetailPage() {
@@ -318,7 +318,7 @@ export default function TemplateDetailPage() {
     return (
       <div>
         <div className="page-header">
-          <Link to="/templates" style={{ color: '#667eea', textDecoration: 'none', marginBottom: '0.5rem', display: 'block' }}>
+          <Link to="/templates" style={{ color: '#166534', textDecoration: 'none', marginBottom: '0.5rem', display: 'block' }}>
             ← Back to Templates
           </Link>
         </div>
@@ -345,7 +345,7 @@ export default function TemplateDetailPage() {
       />
       <div className="page-header">
         <div>
-          <Link to="/templates" style={{ color: '#667eea', textDecoration: 'none', marginBottom: '0.5rem', display: 'block' }}>
+          <Link to="/templates" style={{ color: '#166534', textDecoration: 'none', marginBottom: '0.5rem', display: 'block' }}>
             ← Back to Templates
           </Link>
           <h1 className="page-title">{isNew ? 'Create Template' : 'Edit Template'}</h1>
@@ -538,7 +538,7 @@ export default function TemplateDetailPage() {
                             <div className="task-description">{task.description}</div>
                           )}
                           {task.leadReviewTime && task.leadReviewTime > 0 && (
-                            <div style={{ fontSize: '0.75rem', color: '#667eea', marginTop: '0.25rem', fontWeight: 500 }}>
+                            <div style={{ fontSize: '0.75rem', color: '#166534', marginTop: '0.25rem', fontWeight: 500 }}>
                               Lead/Review Time: {task.leadReviewTime} day{task.leadReviewTime !== 1 ? 's' : ''}
                             </div>
                           )}

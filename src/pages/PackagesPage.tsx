@@ -133,23 +133,23 @@ export default function PackagesPage() {
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ backgroundColor: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
-                  <th style={{ padding: '0.5rem 0.75rem', textAlign: 'left', fontWeight: 600, fontSize: '0.75rem', color: '#374151', width: '32px' }}>
+                <tr style={{ backgroundColor: '#f0fdf4', borderBottom: '2px solid #166534' }}>
+                  <th style={{ padding: '0.5rem 0.75rem', textAlign: 'left', fontWeight: 600, fontSize: '0.75rem', color: '#14532d', width: '32px' }}>
                     {/* Expand icon column */}
                   </th>
-                  <th style={{ padding: '0.5rem 0.75rem', textAlign: 'left', fontWeight: 600, fontSize: '0.75rem', color: '#374151' }}>
+                  <th style={{ padding: '0.5rem 0.75rem', textAlign: 'left', fontWeight: 600, fontSize: '0.75rem', color: '#14532d' }}>
                     Package
                   </th>
-                  <th style={{ padding: '0.5rem 0.75rem', textAlign: 'left', fontWeight: 600, fontSize: '0.75rem', color: '#374151' }}>
+                  <th style={{ padding: '0.5rem 0.75rem', textAlign: 'left', fontWeight: 600, fontSize: '0.75rem', color: '#14532d' }}>
                     Progress
                   </th>
-                  <th style={{ padding: '0.5rem 0.75rem', textAlign: 'left', fontWeight: 600, fontSize: '0.75rem', color: '#374151' }}>
+                  <th style={{ padding: '0.5rem 0.75rem', textAlign: 'left', fontWeight: 600, fontSize: '0.75rem', color: '#14532d' }}>
                     Expected Start
                   </th>
-                  <th style={{ padding: '0.5rem 0.75rem', textAlign: 'left', fontWeight: 600, fontSize: '0.75rem', color: '#374151' }}>
+                  <th style={{ padding: '0.5rem 0.75rem', textAlign: 'left', fontWeight: 600, fontSize: '0.75rem', color: '#14532d' }}>
                     Days Remaining
                   </th>
-                  <th style={{ padding: '0.5rem 0.75rem', textAlign: 'left', fontWeight: 600, fontSize: '0.75rem', color: '#374151', width: '120px' }}>
+                  <th style={{ padding: '0.5rem 0.75rem', textAlign: 'left', fontWeight: 600, fontSize: '0.75rem', color: '#14532d', width: '120px' }}>
                     Actions
                   </th>
                 </tr>
@@ -169,10 +169,10 @@ export default function PackagesPage() {
                         style={{
                           cursor: 'pointer',
                           borderBottom: '1px solid #e5e7eb',
-                          backgroundColor: isExpanded ? '#f9fafb' : 'white',
+                          backgroundColor: isExpanded ? '#f0fdf4' : 'white',
                         }}
                         onMouseEnter={(e) => {
-                          if (!isExpanded) e.currentTarget.style.backgroundColor = '#f3f4f6';
+                          if (!isExpanded) e.currentTarget.style.backgroundColor = '#dcfce7';
                         }}
                         onMouseLeave={(e) => {
                           if (!isExpanded) e.currentTarget.style.backgroundColor = 'white';
@@ -197,7 +197,7 @@ export default function PackagesPage() {
                         </td>
                         <td style={{ padding: '0.5rem 0.75rem', verticalAlign: 'middle' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#667eea', minWidth: '40px' }}>
+                            <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#166534', minWidth: '40px' }}>
                               {completion}%
                             </div>
                             <div className="progress-bar" style={{ width: '80px', height: '6px', flex: '0 0 auto' }}>
@@ -256,7 +256,7 @@ export default function PackagesPage() {
                       </tr>
                       {isExpanded && (
                         <tr key={`${pkg.id}-expanded`}>
-                          <td colSpan={6} style={{ padding: 0, backgroundColor: '#f9fafb' }}>
+                          <td colSpan={6} style={{ padding: 0, backgroundColor: '#f0fdf4' }}>
                             <div style={{ padding: '1rem' }}>
                               <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.75rem' }}>
                                 Tasks ({pkg.tasks.length})
@@ -278,7 +278,7 @@ export default function PackagesPage() {
                                             backgroundColor: category.color,
                                           }}
                                         />
-                                        <h4 style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151' }}>
+                                        <h4 style={{ fontSize: '0.75rem', fontWeight: 600, color: '#14532d' }}>
                                           {category.name}
                                         </h4>
                                         <span style={{ fontSize: '0.65rem', color: '#6b7280' }}>
@@ -297,7 +297,7 @@ export default function PackagesPage() {
                                                 alignItems: 'center',
                                                 gap: '0.5rem',
                                                 padding: '0.375rem 0.5rem',
-                                                backgroundColor: task.completed ? '#f3f4f6' : 'white',
+                                                backgroundColor: task.completed ? '#dcfce7' : 'white',
                                                 borderRadius: '4px',
                                                 border: '1px solid #e5e7eb',
                                                 opacity: task.completed ? 0.7 : 1,

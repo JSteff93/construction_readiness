@@ -84,16 +84,16 @@ export default function PackageSelectionModal({
                     alignItems: 'center',
                     gap: '0.75rem',
                     padding: '0.75rem',
-                    border: '1px solid #e5e7eb',
+                    border: '1px solid #bbf7d0',
                     borderRadius: '8px',
                     marginBottom: '0.5rem',
                     cursor: 'pointer',
-                    backgroundColor: selectedPackageIds.has(pkg.id) ? '#f0f9ff' : 'white',
+                    backgroundColor: selectedPackageIds.has(pkg.id) ? '#dcfce7' : 'white',
                     transition: 'background-color 0.2s',
                   }}
                   onMouseEnter={(e) => {
                     if (!selectedPackageIds.has(pkg.id)) {
-                      e.currentTarget.style.backgroundColor = '#f9fafb';
+                      e.currentTarget.style.backgroundColor = '#f0fdf4';
                     }
                   }}
                   onMouseLeave={(e) => {
@@ -131,7 +131,7 @@ export default function PackageSelectionModal({
           </>
         )}
 
-        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', borderTop: '2px solid #f3f4f6', paddingTop: '1rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', borderTop: '2px solid #dcfce7', paddingTop: '1rem' }}>
           <button onClick={onCancel} className="btn btn-secondary">
             Cancel
           </button>

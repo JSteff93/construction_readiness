@@ -292,7 +292,7 @@ export default function PackageDetailPage() {
       return (
         <div>
           <div className="page-header">
-            <Link to="/" style={{ color: '#667eea', textDecoration: 'none', marginBottom: '0.5rem', display: 'block' }}>
+            <Link to="/" style={{ color: '#166534', textDecoration: 'none', marginBottom: '0.5rem', display: 'block' }}>
               ← Back to Packages
             </Link>
             <h1 className="page-title">Create Package</h1>
@@ -309,7 +309,7 @@ export default function PackageDetailPage() {
       <div>
         <div className="page-header">
           <div>
-            <Link to="/" style={{ color: '#667eea', textDecoration: 'none', marginBottom: '0.5rem', display: 'block' }}>
+            <Link to="/" style={{ color: '#166534', textDecoration: 'none', marginBottom: '0.5rem', display: 'block' }}>
               ← Back to Packages
             </Link>
             <h1 className="page-title">Create Package</h1>
@@ -382,7 +382,7 @@ export default function PackageDetailPage() {
     return (
       <div>
         <div className="page-header">
-          <Link to="/" style={{ color: '#667eea', textDecoration: 'none', marginBottom: '0.5rem', display: 'block' }}>
+          <Link to="/" style={{ color: '#166534', textDecoration: 'none', marginBottom: '0.5rem', display: 'block' }}>
             ← Back to Packages
           </Link>
         </div>
@@ -406,7 +406,7 @@ export default function PackageDetailPage() {
     <div>
       <div className="page-header">
         <div>
-          <Link to="/" style={{ color: '#667eea', textDecoration: 'none', marginBottom: '0.5rem', display: 'block' }}>
+          <Link to="/" style={{ color: '#166534', textDecoration: 'none', marginBottom: '0.5rem', display: 'block' }}>
             ← Back to Packages
           </Link>
           <h1 className="page-title">{pkg.name}</h1>
@@ -443,7 +443,7 @@ export default function PackageDetailPage() {
             </div>
           </div>
           <div>
-            <div style={{ fontSize: '2rem', fontWeight: 700, color: '#667eea', marginBottom: '0.5rem' }}>
+            <div style={{ fontSize: '2rem', fontWeight: 700, color: '#166534', marginBottom: '0.5rem' }}>
               {completion}%
             </div>
             <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>

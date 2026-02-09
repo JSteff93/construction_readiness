@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Package, Task, TaskStatus, TASK_STATUSES, DEFAULT_TASK_STATUS } from '../types';
 import { loadData, savePackage } from '../utils/storage';
 import LoadingBulldozer from '../components/LoadingBulldozer';
-import { formatDateShort, getCountdownColor } from '../utils/dateUtils';
+import { formatDateShort } from '../utils/dateUtils';
 
 const STATUS_COLORS: Record<TaskStatus, { bg: string; border: string; text: string }> = {
   Pending: { bg: '#f1f5f9', border: '#94a3b8', text: '#475569' },
@@ -23,10 +23,12 @@ interface TaskWithPackage extends Task {
 
 type SortColumn = 'package' | 'dueDate' | 'category' | 'status';
 type SortDirection = 'asc' | 'desc';
+type ViewMode = 'list' | 'board';
 
 export default function TasksPage() {
   const [packages, setPackages] = useState<Package[]>([]);
   const [tasks, setTasks] = useState<TaskWithPackage[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [sortColumn, setSortColumn] = useState<SortColumn | null>('dueDate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [filterCompleted, setFilterCompleted] = useState<boolean>(true);
@@ -35,10 +37,14 @@ export default function TasksPage() {
   const [filterStatuses, setFilterStatuses] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [openStatusKey, setOpenStatusKey] = useState<string | null>(null);
+  const [draggedTaskKey, setDraggedTaskKey] = useState<string | null>(null);
+  const [boardDrawerTask, setBoardDrawerTask] = useState<TaskWithPackage | null>(null);
+  const [boardDrawerOpen, setBoardDrawerOpen] = useState(false);
   const [editingDueDateKey, setEditingDueDateKey] = useState<string | null>(null);
   const [openFilterColumn, setOpenFilterColumn] = useState<'package' | 'category' | 'status' | null>(null);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const filterDropdownRef = useRef<HTMLDivElement>(null);
+  const boardJustDraggedRef = useRef(false);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -59,6 +65,28 @@ export default function TasksPage() {
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
+
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setBoardDrawerTask(null);
+    };
+    if (boardDrawerTask) {
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }
+  }, [boardDrawerTask]);
+
+  useEffect(() => {
+    if (boardDrawerTask) {
+      setBoardDrawerOpen(false);
+      const id = requestAnimationFrame(() => {
+        requestAnimationFrame(() => setBoardDrawerOpen(true));
+      });
+      return () => cancelAnimationFrame(id);
+    } else {
+      setBoardDrawerOpen(false);
+    }
+  }, [boardDrawerTask]);
 
   const loadTasks = async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -269,10 +297,88 @@ export default function TasksPage() {
     );
   }
 
+  const handleDragStart = (e: React.DragEvent, task: TaskWithPackage) => {
+    boardJustDraggedRef.current = true;
+    e.dataTransfer.setData('application/json', JSON.stringify({ packageId: task.packageId, taskId: task.id }));
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggedTaskKey(`${task.packageId}-${task.id}`);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedTaskKey(null);
+    setTimeout(() => {
+      boardJustDraggedRef.current = false;
+    }, 300);
+  };
+
+  const handleColumnDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleColumnDrop = (e: React.DragEvent, targetStatus: TaskStatus) => {
+    e.preventDefault();
+    const raw = e.dataTransfer.getData('application/json');
+    if (!raw) return;
+    const { packageId, taskId } = JSON.parse(raw);
+    const task = tasks.find(t => t.packageId === packageId && t.id === taskId);
+    if (task && getTaskStatus(task) !== targetStatus) {
+      handleTaskStatusChange(task, targetStatus);
+    }
+  };
+
+  const tasksByStatus = TASK_STATUSES.reduce<Record<TaskStatus, TaskWithPackage[]>>(
+    (acc, status) => {
+      acc[status] = sortedTasks
+        .filter(t => getTaskStatus(t) === status)
+        .sort((a, b) => {
+          const dateA = a.dueDate ? new Date(a.dueDate).getTime() : new Date(a.packageExpectedStartDate).getTime();
+          const dateB = b.dueDate ? new Date(b.dueDate).getTime() : new Date(b.packageExpectedStartDate).getTime();
+          return dateA - dateB;
+        });
+      return acc;
+    },
+    { Pending: [], 'In Progress': [], Waiting: [], Complete: [], Delegated: [] }
+  );
+
   return (
     <div>
-      <div className="page-header">
+      <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
         <h1 className="page-title">All Tasks</h1>
+        <div style={{ display: 'flex', gap: '0.25rem' }}>
+          <button
+            type="button"
+            onClick={() => setViewMode('list')}
+            style={{
+              padding: '0.5rem 1rem',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              border: '1px solid #e5e7eb',
+              borderRadius: '6px',
+              backgroundColor: viewMode === 'list' ? '#166534' : '#f0fdf4',
+              color: viewMode === 'list' ? 'white' : '#14532d',
+              cursor: 'pointer',
+            }}
+          >
+            List
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('board')}
+            style={{
+              padding: '0.5rem 1rem',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              border: '1px solid #e5e7eb',
+              borderRadius: '6px',
+              backgroundColor: viewMode === 'board' ? '#166534' : '#f0fdf4',
+              color: viewMode === 'board' ? 'white' : '#14532d',
+              cursor: 'pointer',
+            }}
+          >
+            Board
+          </button>
+        </div>
       </div>
 
       <div className="card" style={{ marginBottom: '2rem' }}>
@@ -294,18 +400,320 @@ export default function TasksPage() {
         </div>
       </div>
 
+      {viewMode === 'board' ? (
+        <>
+          {boardDrawerTask && (() => {
+            const task = tasks.find(t => t.packageId === boardDrawerTask.packageId && t.id === boardDrawerTask.id) ?? boardDrawerTask;
+            return (
+            <>
+              <div
+                role="button"
+                tabIndex={0}
+                aria-label="Close drawer"
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  backgroundColor: 'rgba(0,0,0,0.35)',
+                  zIndex: 40,
+                  transition: 'opacity 0.2s ease-out',
+                }}
+                onClick={() => setBoardDrawerTask(null)}
+              />
+              <div
+                style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  bottom: 0,
+                  width: 'min(380px, 90vw)',
+                  backgroundColor: 'white',
+                  boxShadow: '4px 0 20px rgba(0,0,0,0.15)',
+                  zIndex: 41,
+                  overflowY: 'auto',
+                  padding: '1.25rem',
+                  transform: boardDrawerOpen ? 'translateX(0)' : 'translateX(-100%)',
+                  transition: 'transform 0.25s ease-out',
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#14532d', margin: 0 }}>
+                    Task details
+                  </h2>
+                  <button
+                    type="button"
+                    aria-label="Close"
+                    onClick={() => setBoardDrawerTask(null)}
+                    style={{
+                      padding: '0.35rem',
+                      border: 'none',
+                      background: 'none',
+                      cursor: 'pointer',
+                      fontSize: '1.25rem',
+                      lineHeight: 1,
+                      color: '#6b7280',
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+                <Link
+                  to={`/packages/${task.packageId}`}
+                  style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    color: '#166534',
+                    fontWeight: 500,
+                    marginBottom: '0.75rem',
+                    textDecoration: 'none',
+                  }}
+                >
+                  ← {task.packageName}
+                </Link>
+                <div style={{ fontWeight: 600, fontSize: '1.1rem', marginBottom: '0.5rem', color: '#14532d' }}>
+                  {task.name}
+                </div>
+                {task.description && (
+                  <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '1rem', lineHeight: 1.4 }}>
+                    {task.description}
+                  </p>
+                )}
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    padding: '0.25rem 0.6rem',
+                    borderRadius: '8px',
+                    fontSize: '0.8rem',
+                    fontWeight: 500,
+                    backgroundColor: task.categoryColor + '20',
+                    color: task.categoryColor,
+                    marginBottom: '1rem',
+                  }}
+                >
+                  {task.categoryName}
+                </div>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#14532d', marginBottom: '0.35rem' }}>
+                    Due date
+                  </label>
+                  <input
+                    type="date"
+                    value={getTaskDueDate(task)}
+                    onChange={(e) => handleTaskDueDateChange(task, e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem 0.75rem',
+                      fontSize: '0.875rem',
+                      border: '2px solid #bbf7d0',
+                      borderRadius: '6px',
+                    }}
+                  />
+                  {(isTaskOverdue(task) || isTaskDueAfterStart(task)) && !task.completed && (
+                    <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 500, display: 'block', marginTop: '0.25rem' }}>
+                      {isTaskOverdue(task) ? 'Overdue' : 'After start date'}
+                    </span>
+                  )}
+                </div>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#14532d', marginBottom: '0.35rem' }}>
+                    Status
+                  </label>
+                  <div
+                    ref={openStatusKey === `drawer-${task.packageId}-${task.id}` ? statusDropdownRef : undefined}
+                    style={{ position: 'relative', display: 'inline-block', width: '100%' }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setOpenStatusKey(openStatusKey === `drawer-${task.packageId}-${task.id}` ? null : `drawer-${task.packageId}-${task.id}`)}
+                      style={{
+                        width: '100%',
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: '6px',
+                        border: `2px solid ${STATUS_COLORS[getTaskStatus(task)].border}`,
+                        backgroundColor: STATUS_COLORS[getTaskStatus(task)].bg,
+                        color: STATUS_COLORS[getTaskStatus(task)].text,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                      }}
+                    >
+                      {getTaskStatus(task)} {openStatusKey === `drawer-${task.packageId}-${task.id}` ? '▲' : '▼'}
+                    </button>
+                    {openStatusKey === `drawer-${task.packageId}-${task.id}` && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          right: 0,
+                          marginTop: '4px',
+                          zIndex: 10,
+                          borderRadius: '6px',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                          backgroundColor: 'white',
+                          border: '1px solid #e5e7eb',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {TASK_STATUSES.map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => {
+                              handleTaskStatusChange(task, s);
+                              setOpenStatusKey(null);
+                            }}
+                            style={{
+                              display: 'block',
+                              width: '100%',
+                              fontSize: '0.875rem',
+                              fontWeight: 500,
+                              padding: '0.5rem 0.75rem',
+                              border: 'none',
+                              borderBottom: s !== TASK_STATUSES[TASK_STATUSES.length - 1] ? '1px solid #e5e7eb' : undefined,
+                              backgroundColor: s === getTaskStatus(task) ? STATUS_COLORS[s].bg : 'white',
+                              color: STATUS_COLORS[s].text,
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                            }}
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {task.leadReviewTime != null && task.leadReviewTime > 0 && (
+                  <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                    Lead/Review time: {task.leadReviewTime} day{task.leadReviewTime !== 1 ? 's' : ''}
+                  </p>
+                )}
+              </div>
+            </>
+            );
+          })()}
+        <div style={{ display: 'flex', gap: '0.8rem', overflowX: 'auto', paddingBottom: '0.4rem' }}>
+          {TASK_STATUSES.map(status => (
+            <div
+              key={status}
+              style={{
+                flex: '0 0 224px',
+                minWidth: 224,
+                backgroundColor: '#f0fdf4',
+                borderRadius: '6px',
+                border: '1px solid #e5e7eb',
+                display: 'flex',
+                flexDirection: 'column',
+                maxHeight: 'calc(100vh - 224px)',
+              }}
+            >
+              <div
+                style={{
+                  padding: '0.6rem 0.8rem',
+                  borderBottom: `2px solid ${STATUS_COLORS[status].border}`,
+                  backgroundColor: STATUS_COLORS[status].bg,
+                  borderRadius: '6px 6px 0 0',
+                  fontWeight: 600,
+                  fontSize: '0.7rem',
+                  color: STATUS_COLORS[status].text,
+                }}
+              >
+                {status} ({tasksByStatus[status].length})
+              </div>
+              <div
+                style={{ flex: 1, overflowY: 'auto', padding: '0.4rem', minHeight: 64 }}
+                onDragOver={handleColumnDragOver}
+                onDrop={(e) => handleColumnDrop(e, status)}
+              >
+                {tasksByStatus[status].map(task => {
+                  const dueDate = getTaskDueDate(task);
+                  const statusKey = `${task.packageId}-${task.id}`;
+                  return (
+                    <div
+                      key={statusKey}
+                      role="button"
+                      tabIndex={0}
+                      className="card"
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, task)}
+                      onDragEnd={handleDragEnd}
+                      onClick={() => {
+                        if (!boardJustDraggedRef.current) setBoardDrawerTask(task);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          if (!boardJustDraggedRef.current) setBoardDrawerTask(task);
+                        }
+                      }}
+                      style={{
+                        marginBottom: '0.4rem',
+                        padding: '0.6rem',
+                        backgroundColor: task.completed ? '#dcfce7' : 'white',
+                        opacity: draggedTaskKey === statusKey ? 0.5 : (task.completed ? 0.7 : 1),
+                        border: '1px solid #e5e7eb',
+                        cursor: 'grab',
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: '0.56rem',
+                          color: '#166534',
+                          fontWeight: 500,
+                          display: 'block',
+                          marginBottom: '0.2rem',
+                        }}
+                      >
+                        {task.packageName}
+                      </span>
+                      <div style={{ fontWeight: 600, fontSize: '0.72rem', marginBottom: '0.28rem' }}>
+                        {task.name}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.2rem',
+                            padding: '0.12rem 0.4rem',
+                            borderRadius: '6px',
+                            fontSize: '0.56rem',
+                            fontWeight: 500,
+                            backgroundColor: task.categoryColor + '20',
+                            color: task.categoryColor,
+                          }}
+                        >
+                          {task.categoryName}
+                        </span>
+                        <span style={{ fontSize: '0.6rem', color: '#6b7280' }}>
+                          {formatDateShort(dueDate)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+        </>
+      ) : (
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
             <thead>
-                <tr style={{ backgroundColor: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+                <tr style={{ backgroundColor: '#dcfce7', borderBottom: '2px solid #166534' }}>
                   <th
                     style={{
                       padding: '1rem',
                       textAlign: 'left',
                       fontWeight: 600,
                       fontSize: '0.875rem',
-                      color: '#374151',
+                      color: '#14532d',
                       whiteSpace: 'nowrap',
                       verticalAlign: 'middle',
                     }}
@@ -334,7 +742,7 @@ export default function TasksPage() {
                           fontSize: '0.7rem',
                           border: '1px solid #d1d5db',
                           borderRadius: '4px',
-                          backgroundColor: filterPackages.size > 0 ? '#e0e7ff' : '#f9fafb',
+                          backgroundColor: filterPackages.size > 0 ? '#dcfce7' : '#f0fdf4',
                           cursor: 'pointer',
                           fontWeight: 500,
                         }}
@@ -386,7 +794,7 @@ export default function TasksPage() {
                                 padding: '0.35rem 0.75rem',
                                 cursor: 'pointer',
                                 fontSize: '0.8rem',
-                                backgroundColor: filterPackages.has(pkg.id) ? '#e0e7ff' : 'transparent',
+                                backgroundColor: filterPackages.has(pkg.id) ? '#dcfce7' : 'transparent',
                               }}
                             >
                               <input
@@ -402,10 +810,10 @@ export default function TasksPage() {
                       )}
                     </span>
                   </th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.875rem', color: '#374151' }}>
+                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.875rem', color: '#14532d' }}>
                     Task Name
                   </th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.875rem', color: '#374151', width: '13%' }}>
+                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.875rem', color: '#14532d', width: '13%' }}>
                     Description
                   </th>
                   <th
@@ -414,7 +822,7 @@ export default function TasksPage() {
                       textAlign: 'left',
                       fontWeight: 600,
                       fontSize: '0.875rem',
-                      color: '#374151',
+                      color: '#14532d',
                       width: '11%',
                       cursor: 'pointer',
                       userSelect: 'none',
@@ -425,7 +833,7 @@ export default function TasksPage() {
                   >
                     Due Date {sortColumn === 'dueDate' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
                   </th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.875rem', color: '#374151' }}>
+                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.875rem', color: '#14532d' }}>
                     Lead time
                   </th>
                   <th
@@ -434,7 +842,7 @@ export default function TasksPage() {
                       textAlign: 'left',
                       fontWeight: 600,
                       fontSize: '0.875rem',
-                      color: '#374151',
+                      color: '#14532d',
                       whiteSpace: 'nowrap',
                       verticalAlign: 'middle',
                     }}
@@ -463,7 +871,7 @@ export default function TasksPage() {
                           fontSize: '0.7rem',
                           border: '1px solid #d1d5db',
                           borderRadius: '4px',
-                          backgroundColor: filterCategories.size > 0 ? '#e0e7ff' : '#f9fafb',
+                          backgroundColor: filterCategories.size > 0 ? '#dcfce7' : '#f0fdf4',
                           cursor: 'pointer',
                           fontWeight: 500,
                         }}
@@ -515,7 +923,7 @@ export default function TasksPage() {
                                 padding: '0.35rem 0.75rem',
                                 cursor: 'pointer',
                                 fontSize: '0.8rem',
-                                backgroundColor: filterCategories.has(cat) ? '#e0e7ff' : 'transparent',
+                                backgroundColor: filterCategories.has(cat) ? '#dcfce7' : 'transparent',
                               }}
                             >
                               <input
@@ -537,7 +945,7 @@ export default function TasksPage() {
                       textAlign: 'left',
                       fontWeight: 600,
                       fontSize: '0.875rem',
-                      color: '#374151',
+                      color: '#14532d',
                       whiteSpace: 'nowrap',
                       verticalAlign: 'middle',
                     }}
@@ -566,7 +974,7 @@ export default function TasksPage() {
                           fontSize: '0.7rem',
                           border: '1px solid #d1d5db',
                           borderRadius: '4px',
-                          backgroundColor: filterStatuses.size > 0 ? '#e0e7ff' : '#f9fafb',
+                          backgroundColor: filterStatuses.size > 0 ? '#dcfce7' : '#f0fdf4',
                           cursor: 'pointer',
                           fontWeight: 500,
                         }}
@@ -616,7 +1024,7 @@ export default function TasksPage() {
                                 padding: '0.35rem 0.75rem',
                                 cursor: 'pointer',
                                 fontSize: '0.8rem',
-                                backgroundColor: filterStatuses.has(s) ? '#e0e7ff' : 'transparent',
+                                backgroundColor: filterStatuses.has(s) ? '#dcfce7' : 'transparent',
                               }}
                             >
                               <input
@@ -657,7 +1065,6 @@ export default function TasksPage() {
                   const dueDate = getTaskDueDate(task);
                   const isOverdue = isTaskOverdue(task);
                   const isAfterStart = isTaskDueAfterStart(task);
-                  const countdownColor = getCountdownColor(dueDate);
                   const status = getTaskStatus(task);
                   const statusKey = `${task.packageId}-${task.id}`;
 
@@ -666,7 +1073,7 @@ export default function TasksPage() {
                       key={statusKey}
                       style={{
                         borderBottom: '1px solid #e5e7eb',
-                        backgroundColor: task.completed ? '#f9fafb' : 'white',
+                        backgroundColor: task.completed ? '#dcfce7' : 'white',
                         opacity: task.completed ? 0.7 : 1,
                       }}
                     >
@@ -674,7 +1081,7 @@ export default function TasksPage() {
                         <Link
                           to={`/packages/${task.packageId}`}
                           style={{
-                            color: '#667eea',
+                            color: '#166534',
                             textDecoration: 'none',
                             fontWeight: 500,
                           }}
@@ -706,7 +1113,7 @@ export default function TasksPage() {
                               style={{
                                 fontSize: '0.875rem',
                                 padding: '0.25rem 0.5rem',
-                                border: '1px solid #667eea',
+                                border: '1px solid #166534',
                                 borderRadius: '4px',
                                 maxWidth: '140px',
                               }}
@@ -860,6 +1267,7 @@ export default function TasksPage() {
           </table>
         </div>
       </div>
+      )}
     </div>
   );
 }
