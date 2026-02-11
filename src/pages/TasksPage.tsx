@@ -318,6 +318,8 @@ export default function TasksPage() {
 
   const handleColumnDrop = (e: React.DragEvent, targetStatus: TaskStatus) => {
     e.preventDefault();
+    boardJustDraggedRef.current = false;
+    setDraggedTaskKey(null); // Reset so card doesn't stay dimmed if dragend doesn't fire
     const raw = e.dataTransfer.getData('application/json');
     if (!raw) return;
     const { packageId, taskId } = JSON.parse(raw);
