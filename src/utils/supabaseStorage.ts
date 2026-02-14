@@ -80,6 +80,8 @@ export const loadData = async (): Promise<AppData> => {
           dueDate: t.due_date || undefined,
           leadReviewTime: t.lead_review_time || undefined,
           status: (t.status || DEFAULT_TASK_STATUS) as Task['status'],
+          taskOwner: t.task_owner || undefined,
+          taskAssignee: t.task_assignee || undefined,
         }));
 
       return {
@@ -114,6 +116,8 @@ export const loadData = async (): Promise<AppData> => {
           dueDate: t.due_date || undefined,
           leadReviewTime: t.lead_review_time || undefined,
           status: (t.status || DEFAULT_TASK_STATUS) as Task['status'],
+          taskOwner: t.task_owner || undefined,
+          taskAssignee: t.task_assignee || undefined,
         }));
 
       return {
@@ -192,6 +196,8 @@ export const saveTemplate = async (template: Template): Promise<void> => {
         due_date: task.dueDate || null,
         lead_review_time: task.leadReviewTime || null,
         status: task.status || DEFAULT_TASK_STATUS,
+        task_owner: task.taskOwner || null,
+        task_assignee: task.taskAssignee || null,
         template_id: template.id,
         package_id: null,
       }));
@@ -301,6 +307,8 @@ export const savePackage = async (pkg: Package): Promise<void> => {
         due_date: task.dueDate || null,
         lead_review_time: task.leadReviewTime || null,
         status: task.status || DEFAULT_TASK_STATUS,
+        task_owner: task.taskOwner || null,
+        task_assignee: task.taskAssignee || null,
         template_id: null,
         package_id: pkg.id,
       }));

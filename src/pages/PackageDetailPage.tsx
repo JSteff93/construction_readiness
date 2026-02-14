@@ -18,6 +18,8 @@ export default function PackageDetailPage() {
   const [newTaskName, setNewTaskName] = useState<string>('');
   const [newTaskDescription, setNewTaskDescription] = useState<string>('');
   const [newTaskLeadReviewTime, setNewTaskLeadReviewTime] = useState<string>('');
+  const [newTaskOwner, setNewTaskOwner] = useState<string>('');
+  const [newTaskAssignee, setNewTaskAssignee] = useState<string>('');
   const [previousExpectedStartDate, setPreviousExpectedStartDate] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
@@ -149,6 +151,8 @@ export default function PackageDetailPage() {
           dueDate: calculateDueDate(expectedStartDate, t.leadReviewTime),
           leadReviewTime: t.leadReviewTime,
           status: DEFAULT_TASK_STATUS,
+          taskOwner: t.taskOwner,
+          taskAssignee: t.taskAssignee,
         };
       });
 
@@ -224,6 +228,8 @@ export default function PackageDetailPage() {
       dueDate,
       leadReviewTime,
       status: DEFAULT_TASK_STATUS,
+      taskOwner: newTaskOwner.trim() || undefined,
+      taskAssignee: newTaskAssignee.trim() || undefined,
     };
     
     setPackage({
@@ -235,6 +241,8 @@ export default function PackageDetailPage() {
     setNewTaskName('');
     setNewTaskDescription('');
     setNewTaskLeadReviewTime('');
+    setNewTaskOwner('');
+    setNewTaskAssignee('');
     setAddingTaskToCategory(null);
   };
 
@@ -278,6 +286,8 @@ export default function PackageDetailPage() {
     setNewTaskName('');
     setNewTaskDescription('');
     setNewTaskLeadReviewTime('');
+    setNewTaskOwner('');
+    setNewTaskAssignee('');
     setAddingTaskToCategory(null);
   };
 
@@ -565,6 +575,13 @@ export default function PackageDetailPage() {
                             </div>
                           </div>
                         </div>
+                        {(task.taskOwner || task.taskAssignee) && (
+                          <div style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                            {task.taskOwner && <span>Owner: {task.taskOwner}</span>}
+                            {task.taskOwner && task.taskAssignee && ' · '}
+                            {task.taskAssignee && <span>Assignee: {task.taskAssignee}</span>}
+                          </div>
+                        )}
                         {task.completed && task.completedDate && (
                           <div style={{ fontSize: '0.75rem', color: '#10b981', marginTop: '0.25rem' }}>
                             Completed: {formatDate(task.completedDate)}
@@ -622,6 +639,28 @@ export default function PackageDetailPage() {
                           ? `Due date will be ${newTaskLeadReviewTime} day${parseInt(newTaskLeadReviewTime, 10) !== 1 ? 's' : ''} before expected start date`
                           : 'Due date will match expected start date'}
                       </p>
+                    </div>
+                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                      <div className="form-group" style={{ marginBottom: '1rem', flex: '1 1 140px' }}>
+                        <label className="form-label">Task Owner</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="Optional"
+                          value={newTaskOwner}
+                          onChange={(e) => setNewTaskOwner(e.target.value)}
+                        />
+                      </div>
+                      <div className="form-group" style={{ marginBottom: '1rem', flex: '1 1 140px' }}>
+                        <label className="form-label">Task Assignee</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="Optional"
+                          value={newTaskAssignee}
+                          onChange={(e) => setNewTaskAssignee(e.target.value)}
+                        />
+                      </div>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                       <button onClick={handleCancelAddTask} className="btn btn-secondary btn-sm">

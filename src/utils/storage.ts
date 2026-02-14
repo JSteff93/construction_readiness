@@ -1,7 +1,33 @@
-import { AppData, Template, Package } from '../types';
+import { AppData, Template, Package, Task } from '../types';
 import * as supabaseStorage from './supabaseStorage';
 
 const STORAGE_KEY = 'construction-readiness-data';
+const MIGRATE_JAMES_FLAG = 'construction-readiness-migrated-task-owners-james';
+
+// One-time migration: set all existing tasks' owner and assignee to "James"
+const migrateTaskOwnersToJames = (data: AppData): AppData => {
+  if (localStorage.getItem(MIGRATE_JAMES_FLAG) === 'true') return data;
+
+  const updateTask = (t: Task): Task => ({ ...t, taskOwner: 'James', taskAssignee: 'James' });
+
+  const templates = data.templates.map(t => ({
+    ...t,
+    tasks: t.tasks.map(updateTask),
+  }));
+  const packages = data.packages.map(p => ({
+    ...p,
+    tasks: p.tasks.map(updateTask),
+  }));
+
+  const migrated = { templates, packages };
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+    localStorage.setItem(MIGRATE_JAMES_FLAG, 'true');
+  } catch (e) {
+    console.error('Migration save failed:', e);
+  }
+  return migrated;
+};
 
 // Check if Supabase is configured
 const isSupabaseConfigured = (): boolean => {
@@ -13,9 +39,10 @@ const isSupabaseConfigured = (): boolean => {
 // LocalStorage fallback functions
 const loadDataLocal = (): AppData => {
   try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    if (data) {
-      return JSON.parse(data);
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const data = JSON.parse(raw) as AppData;
+      return migrateTaskOwnersToJames(data);
     }
   } catch (error) {
     console.error('Error loading data from storage:', error);

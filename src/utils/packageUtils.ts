@@ -51,6 +51,8 @@ export const addNewTasksToPackage = (
           dueDate: calculateDueDate(pkg.expectedStartDate, templateTask.leadReviewTime),
           leadReviewTime: templateTask.leadReviewTime,
           status: DEFAULT_TASK_STATUS,
+          taskOwner: templateTask.taskOwner,
+          taskAssignee: templateTask.taskAssignee,
         };
         tasksToAdd.push(newTask);
       }

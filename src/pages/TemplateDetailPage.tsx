@@ -33,6 +33,8 @@ export default function TemplateDetailPage() {
   const [newTaskName, setNewTaskName] = useState<string>('');
   const [newTaskDescription, setNewTaskDescription] = useState<string>('');
   const [newTaskLeadReviewTime, setNewTaskLeadReviewTime] = useState<string>('');
+  const [newTaskOwner, setNewTaskOwner] = useState<string>('');
+  const [newTaskAssignee, setNewTaskAssignee] = useState<string>('');
   const [showPackageModal, setShowPackageModal] = useState(false);
   const [packagesUsingTemplate, setPackagesUsingTemplate] = useState<Package[]>([]);
   const [selectedPackageIds, setSelectedPackageIds] = useState<Set<string>>(new Set());
@@ -201,6 +203,8 @@ export default function TemplateDetailPage() {
       completed: false,
       leadReviewTime,
       status: DEFAULT_TASK_STATUS,
+      taskOwner: newTaskOwner.trim() || undefined,
+      taskAssignee: newTaskAssignee.trim() || undefined,
     };
     
     setTemplate({
@@ -212,6 +216,8 @@ export default function TemplateDetailPage() {
     setNewTaskName('');
     setNewTaskDescription('');
     setNewTaskLeadReviewTime('');
+    setNewTaskOwner('');
+    setNewTaskAssignee('');
     setAddingTaskToCategory(null);
   };
 
@@ -219,6 +225,8 @@ export default function TemplateDetailPage() {
     setNewTaskName('');
     setNewTaskDescription('');
     setNewTaskLeadReviewTime('');
+    setNewTaskOwner('');
+    setNewTaskAssignee('');
     setAddingTaskToCategory(null);
   };
 
@@ -227,6 +235,8 @@ export default function TemplateDetailPage() {
     setNewTaskName(task.name);
     setNewTaskDescription(task.description || '');
     setNewTaskLeadReviewTime(task.leadReviewTime?.toString() || '');
+    setNewTaskOwner(task.taskOwner || '');
+    setNewTaskAssignee(task.taskAssignee || '');
   };
 
   const handleSaveEditTask = () => {
@@ -241,12 +251,16 @@ export default function TemplateDetailPage() {
       name: newTaskName.trim(),
       description: newTaskDescription.trim() || undefined,
       leadReviewTime,
+      taskOwner: newTaskOwner.trim() || undefined,
+      taskAssignee: newTaskAssignee.trim() || undefined,
     });
     
     // Reset form
     setNewTaskName('');
     setNewTaskDescription('');
     setNewTaskLeadReviewTime('');
+    setNewTaskOwner('');
+    setNewTaskAssignee('');
     setEditingTaskId(null);
   };
 
@@ -254,6 +268,8 @@ export default function TemplateDetailPage() {
     setNewTaskName('');
     setNewTaskDescription('');
     setNewTaskLeadReviewTime('');
+    setNewTaskOwner('');
+    setNewTaskAssignee('');
     setEditingTaskId(null);
   };
 
@@ -517,6 +533,28 @@ export default function TemplateDetailPage() {
                               : 'Due date will match expected start date'}
                           </p>
                         </div>
+                        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                          <div className="form-group" style={{ marginBottom: '1rem', flex: '1 1 140px' }}>
+                            <label className="form-label">Task Owner</label>
+                            <input
+                              type="text"
+                              className="form-input"
+                              placeholder="Optional"
+                              value={newTaskOwner}
+                              onChange={(e) => setNewTaskOwner(e.target.value)}
+                            />
+                          </div>
+                          <div className="form-group" style={{ marginBottom: '1rem', flex: '1 1 140px' }}>
+                            <label className="form-label">Task Assignee</label>
+                            <input
+                              type="text"
+                              className="form-input"
+                              placeholder="Optional"
+                              value={newTaskAssignee}
+                              onChange={(e) => setNewTaskAssignee(e.target.value)}
+                            />
+                          </div>
+                        </div>
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                           <button onClick={handleCancelEditTask} className="btn btn-secondary btn-sm">
                             Cancel
@@ -540,6 +578,13 @@ export default function TemplateDetailPage() {
                           {task.leadReviewTime && task.leadReviewTime > 0 && (
                             <div style={{ fontSize: '0.75rem', color: '#166534', marginTop: '0.25rem', fontWeight: 500 }}>
                               Lead/Review Time: {task.leadReviewTime} day{task.leadReviewTime !== 1 ? 's' : ''}
+                            </div>
+                          )}
+                          {(task.taskOwner || task.taskAssignee) && (
+                            <div style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                              {task.taskOwner && <span>Owner: {task.taskOwner}</span>}
+                              {task.taskOwner && task.taskAssignee && ' · '}
+                              {task.taskAssignee && <span>Assignee: {task.taskAssignee}</span>}
                             </div>
                           )}
                         </div>
@@ -599,6 +644,28 @@ export default function TemplateDetailPage() {
                             ? `Due date will be ${newTaskLeadReviewTime} day${parseInt(newTaskLeadReviewTime, 10) !== 1 ? 's' : ''} before expected start date`
                             : 'Due date will match expected start date'}
                         </p>
+                      </div>
+                      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                        <div className="form-group" style={{ marginBottom: '1rem', flex: '1 1 140px' }}>
+                          <label className="form-label">Task Owner</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            placeholder="Optional"
+                            value={newTaskOwner}
+                            onChange={(e) => setNewTaskOwner(e.target.value)}
+                          />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: '1rem', flex: '1 1 140px' }}>
+                          <label className="form-label">Task Assignee</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            placeholder="Optional"
+                            value={newTaskAssignee}
+                            onChange={(e) => setNewTaskAssignee(e.target.value)}
+                          />
+                        </div>
                       </div>
                       <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                         <button onClick={handleCancelAddTask} className="btn btn-secondary btn-sm">

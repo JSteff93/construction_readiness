@@ -24,7 +24,7 @@ export const downloadTemplateAsExcel = (template: Template): void => {
 
   // Sheet 2: Tasks (main sheet for editing)
   const tasksData: any[] = [
-    ['Category', 'Task Name', 'Description', 'Lead Review Time (days)'],
+    ['Category', 'Task Name', 'Description', 'Lead Review Time (days)', 'Task Owner', 'Task Assignee'],
   ];
 
   // Group tasks by category
@@ -32,7 +32,7 @@ export const downloadTemplateAsExcel = (template: Template): void => {
     const categoryTasks = template.tasks.filter(t => t.categoryId === category.id);
     if (categoryTasks.length === 0) {
       // Add at least one row for each category
-      tasksData.push([category.name, '', '', '']);
+      tasksData.push([category.name, '', '', '', '', '']);
     } else {
       categoryTasks.forEach(task => {
         tasksData.push([
@@ -40,6 +40,8 @@ export const downloadTemplateAsExcel = (template: Template): void => {
           task.name,
           task.description || '',
           task.leadReviewTime || '',
+          task.taskOwner || '',
+          task.taskAssignee || '',
         ]);
       });
     }
@@ -53,6 +55,8 @@ export const downloadTemplateAsExcel = (template: Template): void => {
     { wch: 30 }, // Task Name
     { wch: 40 }, // Description
     { wch: 20 }, // Lead Review Time
+    { wch: 20 }, // Task Owner
+    { wch: 20 }, // Task Assignee
   ];
 
   XLSX.utils.book_append_sheet(workbook, tasksSheet, 'Tasks');
@@ -78,12 +82,12 @@ export const downloadBlankTemplate = (): void => {
 
   // Tasks sheet with headers and example rows
   const tasksData = [
-    ['Category', 'Task Name', 'Description', 'Lead Review Time (days)'],
-    ['Permits', 'Building Permit', 'Obtain building permit from local authority', '14'],
-    ['Permits', 'Electrical Permit', 'Obtain electrical permit', '7'],
-    ['Materials', 'Concrete Order', 'Order concrete for foundation', '21'],
-    ['Materials', 'Rebar Delivery', 'Schedule rebar delivery', '14'],
-    ['Site Preparation', 'Site Survey', 'Complete site survey', '30'],
+    ['Category', 'Task Name', 'Description', 'Lead Review Time (days)', 'Task Owner', 'Task Assignee'],
+    ['Permits', 'Building Permit', 'Obtain building permit from local authority', '14', '', ''],
+    ['Permits', 'Electrical Permit', 'Obtain electrical permit', '7', '', ''],
+    ['Materials', 'Concrete Order', 'Order concrete for foundation', '21', '', ''],
+    ['Materials', 'Rebar Delivery', 'Schedule rebar delivery', '14', '', ''],
+    ['Site Preparation', 'Site Survey', 'Complete site survey', '30', '', ''],
   ];
 
   const tasksSheet = XLSX.utils.aoa_to_sheet(tasksData);
@@ -93,6 +97,8 @@ export const downloadBlankTemplate = (): void => {
     { wch: 20 },
     { wch: 30 },
     { wch: 40 },
+    { wch: 20 },
+    { wch: 20 },
     { wch: 20 },
   ];
 
@@ -150,6 +156,8 @@ export const parseExcelToTemplate = (file: File): Promise<Template> => {
         const taskNameIndex = headers.findIndex((h: string) => h.includes('task') && h.includes('name'));
         const descriptionIndex = headers.findIndex((h: string) => h.includes('description'));
         const leadTimeIndex = headers.findIndex((h: string) => h.includes('lead') || h.includes('review') || h.includes('time'));
+        const taskOwnerIndex = headers.findIndex((h: string) => h.includes('task') && h.includes('owner'));
+        const taskAssigneeIndex = headers.findIndex((h: string) => h.includes('task') && h.includes('assignee'));
 
         if (categoryIndex === -1 || taskNameIndex === -1) {
           reject(new Error('Excel file must have "Category" and "Task Name" columns'));
@@ -184,6 +192,8 @@ export const parseExcelToTemplate = (file: File): Promise<Template> => {
           const description = descriptionIndex >= 0 ? String(row[descriptionIndex] || '').trim() : '';
           const leadTimeStr = leadTimeIndex >= 0 ? String(row[leadTimeIndex] || '').trim() : '';
           const leadTime = leadTimeStr ? parseInt(leadTimeStr, 10) : undefined;
+          const taskOwner = taskOwnerIndex >= 0 ? String(row[taskOwnerIndex] || '').trim() : '';
+          const taskAssignee = taskAssigneeIndex >= 0 ? String(row[taskAssigneeIndex] || '').trim() : '';
 
           const task: Task = {
             id: generateId(),
@@ -193,6 +203,8 @@ export const parseExcelToTemplate = (file: File): Promise<Template> => {
             completed: false,
             leadReviewTime: leadTime && !isNaN(leadTime) ? leadTime : undefined,
             status: DEFAULT_TASK_STATUS,
+            taskOwner: taskOwner || undefined,
+            taskAssignee: taskAssignee || undefined,
           };
 
           tasks.push(task);

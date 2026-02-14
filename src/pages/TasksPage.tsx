@@ -184,6 +184,33 @@ export default function TasksPage() {
     }
   };
 
+  const handleTaskOwnerAssigneeChange = async (
+    task: TaskWithPackage,
+    field: 'taskOwner' | 'taskAssignee',
+    value: string
+  ) => {
+    const pkg = packages.find(p => p.id === task.packageId);
+    if (!pkg) return;
+
+    const updatedTasks = pkg.tasks.map(t =>
+      t.id === task.id ? { ...t, [field]: value || undefined } : t
+    );
+
+    const updatedPackage = { ...pkg, tasks: updatedTasks };
+    setPackages(prev => prev.map(p => (p.id === pkg.id ? updatedPackage : p)));
+    setTasks(prev =>
+      prev.map(t =>
+        t.packageId === pkg.id && t.id === task.id ? { ...t, [field]: value || undefined } : t
+      )
+    );
+    try {
+      await savePackage(updatedPackage);
+    } catch (error) {
+      alert('Error updating task: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      await loadTasks(false);
+    }
+  };
+
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
       setSortDirection(d => (d === 'asc' ? 'desc' : 'asc'));
@@ -589,6 +616,44 @@ export default function TasksPage() {
                     )}
                   </div>
                 </div>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#14532d', marginBottom: '0.35rem' }}>
+                    Task Owner
+                  </label>
+                  <input
+                    type="text"
+                    value={task.taskOwner || ''}
+                    onChange={(e) => handleTaskOwnerAssigneeChange(task, 'taskOwner', e.target.value)}
+                    onBlur={(e) => handleTaskOwnerAssigneeChange(task, 'taskOwner', e.target.value.trim())}
+                    placeholder="Enter owner"
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem 0.75rem',
+                      fontSize: '0.875rem',
+                      border: '2px solid #bbf7d0',
+                      borderRadius: '6px',
+                    }}
+                  />
+                </div>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#14532d', marginBottom: '0.35rem' }}>
+                    Task Assignee
+                  </label>
+                  <input
+                    type="text"
+                    value={task.taskAssignee || ''}
+                    onChange={(e) => handleTaskOwnerAssigneeChange(task, 'taskAssignee', e.target.value)}
+                    onBlur={(e) => handleTaskOwnerAssigneeChange(task, 'taskAssignee', e.target.value.trim())}
+                    placeholder="Enter assignee"
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem 0.75rem',
+                      fontSize: '0.875rem',
+                      border: '2px solid #bbf7d0',
+                      borderRadius: '6px',
+                    }}
+                  />
+                </div>
                 {task.leadReviewTime != null && task.leadReviewTime > 0 && (
                   <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
                     Lead/Review time: {task.leadReviewTime} day{task.leadReviewTime !== 1 ? 's' : ''}
@@ -816,7 +881,7 @@ export default function TasksPage() {
                     Task Name
                   </th>
                   <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.875rem', color: '#14532d', width: '13%' }}>
-                    Description
+                    Task Description
                   </th>
                   <th
                     style={{
@@ -836,7 +901,13 @@ export default function TasksPage() {
                     Due Date {sortColumn === 'dueDate' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
                   </th>
                   <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.875rem', color: '#14532d' }}>
-                    Lead time
+                    Lead Time
+                  </th>
+                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.875rem', color: '#14532d' }}>
+                    Task Owner
+                  </th>
+                  <th style={{ padding: '1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.875rem', color: '#14532d' }}>
+                    Task Assignee
                   </th>
                   <th
                     style={{
@@ -1048,7 +1119,7 @@ export default function TasksPage() {
               {sortedTasks.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={9}
                     style={{
                       padding: '2rem',
                       textAlign: 'center',
@@ -1156,6 +1227,12 @@ export default function TasksPage() {
                         {task.leadReviewTime != null && task.leadReviewTime > 0
                           ? `${task.leadReviewTime} day${task.leadReviewTime !== 1 ? 's' : ''}`
                           : '-'}
+                      </td>
+                      <td style={{ padding: '1rem', color: '#6b7280', fontSize: '0.875rem' }}>
+                        {task.taskOwner || '-'}
+                      </td>
+                      <td style={{ padding: '1rem', color: '#6b7280', fontSize: '0.875rem' }}>
+                        {task.taskAssignee || '-'}
                       </td>
                       <td style={{ padding: '1rem' }}>
                         <span

@@ -26,6 +26,8 @@ export interface Task {
   dueDate?: string;
   leadReviewTime?: number; // in days
   status?: TaskStatus;
+  taskOwner?: string;
+  taskAssignee?: string;
 }
 
 export interface Template {
