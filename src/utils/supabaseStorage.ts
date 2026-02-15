@@ -1,8 +1,14 @@
 import { supabase } from '../lib/supabase';
 import { AppData, Template, Package, Category, Task, DEFAULT_TASK_STATUS } from '../types';
 
+const getCurrentUserId = async (): Promise<string | null> => {
+  if (!supabase) return null;
+  const { data: { user } } = await supabase.auth.getUser();
+  return user?.id ?? null;
+};
+
 /**
- * Load all data from Supabase
+ * Load all data from Supabase (RLS filters by user automatically)
  */
 export const loadData = async (): Promise<AppData> => {
   if (!supabase) {
@@ -151,6 +157,9 @@ export const saveTemplate = async (template: Template): Promise<void> => {
   }
   
   try {
+    const userId = await getCurrentUserId();
+    if (!userId) throw new Error('You must be signed in to save templates');
+
     // Upsert template
     const { error: templateError } = await supabase
       .from('templates')
@@ -159,6 +168,7 @@ export const saveTemplate = async (template: Template): Promise<void> => {
         name: template.name,
         description: template.description || null,
         created_at: template.createdAt,
+        user_id: userId,
       });
 
     if (templateError) throw templateError;
@@ -253,6 +263,9 @@ export const savePackage = async (pkg: Package): Promise<void> => {
   }
   
   try {
+    const userId = await getCurrentUserId();
+    if (!userId) throw new Error('You must be signed in to save packages');
+
     // Upsert package
     const { error: packageError } = await supabase
       .from('packages')
@@ -263,6 +276,7 @@ export const savePackage = async (pkg: Package): Promise<void> => {
         template_id: pkg.templateId,
         expected_start_date: pkg.expectedStartDate,
         created_at: pkg.createdAt,
+        user_id: userId,
       });
 
     if (packageError) throw packageError;
