@@ -10,6 +10,7 @@ import PackageSelectionModal from '../components/PackageSelectionModal';
 import LoadingBulldozer from '../components/LoadingBulldozer';
 import TaskUserAvatar from '../components/TaskUserAvatar';
 import TaskUserAvatarPicker from '../components/TaskUserAvatarPicker';
+import { useProject } from '../contexts/ProjectContext';
 
 const DEFAULT_TASK_USER_ID = 'df028814-9102-417a-b106-b6e5e25c27b1';
 
@@ -21,6 +22,7 @@ const CATEGORY_COLORS = [
 export default function TemplateDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { currentProjectId } = useProject();
   const isNew = id === 'new';
   
   const [template, setTemplate] = useState<Template>({
@@ -56,8 +58,11 @@ export default function TemplateDetailPage() {
         const data = await loadData();
 
         if (isNew) {
-          // Load available templates for duplication
-          setAvailableTemplates(data.templates);
+          // Load available templates for duplication (same project)
+          const sameProject = currentProjectId
+            ? data.templates.filter((t: Template) => t.projectId === currentProjectId)
+            : data.templates;
+          setAvailableTemplates(sameProject);
         } else if (id) {
           const found = data.templates.find(t => t.id === id);
           if (found) {
@@ -86,17 +91,18 @@ export default function TemplateDetailPage() {
       }
     };
     fetchData();
-  }, [id, isNew, navigate]);
+  }, [id, isNew, navigate, currentProjectId]);
 
   const handleSave = async () => {
     if (!template.name.trim()) {
       alert('Please enter a template name');
       return;
     }
+    const toSave: Template = { ...template, projectId: currentProjectId || template.projectId };
 
     // If this is an existing template (not new), check for new tasks
     if (!isNew && originalTemplate) {
-      const newTasks = findNewTasks(originalTemplate, template);
+      const newTasks = findNewTasks(originalTemplate, toSave);
       
       // If there are new tasks and packages using this template, show modal
       if (newTasks.length > 0 && packagesUsingTemplate.length > 0) {
@@ -109,7 +115,7 @@ export default function TemplateDetailPage() {
 
     // Save template and navigate
     try {
-      await saveTemplate(template);
+      await saveTemplate(toSave);
       navigate('/templates');
     } catch (error) {
       alert('Error saving template: ' + (error instanceof Error ? error.message : 'Unknown error'));
@@ -122,17 +128,18 @@ export default function TemplateDetailPage() {
       return;
     }
 
+    const toSave: Template = { ...template, projectId: currentProjectId || template.projectId };
     try {
       // Update selected packages with new tasks
       for (const pkg of packagesUsingTemplate) {
         if (selectedPackageIds.has(pkg.id)) {
-          const updatedPackage = addNewTasksToPackage(pkg, newTasksToAdd, template);
+          const updatedPackage = addNewTasksToPackage(pkg, newTasksToAdd, toSave);
           await savePackage(updatedPackage);
         }
       }
 
       // Save template
-      await saveTemplate(template);
+      await saveTemplate(toSave);
       
       // Show success message
       const packageCount = selectedPackageIds.size;
@@ -152,8 +159,8 @@ export default function TemplateDetailPage() {
 
   const handleCancelPackageSelection = async () => {
     try {
-      // Just save the template without updating packages
-      await saveTemplate(template);
+      const toSave: Template = { ...template, projectId: currentProjectId || template.projectId };
+      await saveTemplate(toSave);
       setShowPackageModal(false);
       navigate('/templates');
     } catch (error) {

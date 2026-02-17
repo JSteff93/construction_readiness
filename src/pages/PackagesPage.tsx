@@ -1,9 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Package, TaskStatus, TASK_STATUSES, DEFAULT_TASK_STATUS } from '../types';
 import { loadData, deletePackage, savePackage } from '../utils/storage';
 import LoadingBulldozer from '../components/LoadingBulldozer';
 import { getCountdownText, getCountdownColor, formatDate } from '../utils/dateUtils';
+import { fetchProfiles, listProfiles } from '../utils/profileService';
+import type { Profile } from '../utils/profileService';
+import TaskUserAvatarPicker from '../components/TaskUserAvatarPicker';
+import { useProject } from '../contexts/ProjectContext';
 
 const STATUS_COLORS: Record<TaskStatus, { bg: string; border: string; text: string }> = {
   Pending: { bg: '#f1f5f9', border: '#94a3b8', text: '#475569' },
@@ -14,10 +18,14 @@ const STATUS_COLORS: Record<TaskStatus, { bg: string; border: string; text: stri
 };
 
 export default function PackagesPage() {
+  const { currentProjectId, setProjects, setCurrentProjectId } = useProject();
+  const navigate = useNavigate();
   const [packages, setPackages] = useState<Package[]>([]);
   const [expandedPackageId, setExpandedPackageId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [openStatusTaskId, setOpenStatusTaskId] = useState<string | null>(null);
+  const [profilesMap, setProfilesMap] = useState<Map<string, Profile>>(new Map());
+  const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -31,17 +39,34 @@ export default function PackagesPage() {
   }, []);
 
   useEffect(() => {
+    if (!currentProjectId) {
+      navigate('/projects', { replace: true });
+      return;
+    }
     const fetchData = async (showLoading = true) => {
       if (showLoading) setLoading(true);
       try {
         const data = await loadData();
-        setPackages(data.packages);
+        setProjects(data.projects || []);
+        const filtered = data.packages.filter((p: Package) => p.projectId === currentProjectId);
+        setPackages(filtered);
+        const userIds = new Set<string>();
+        filtered.forEach((p: Package) => {
+          p.tasks.forEach((t) => {
+            if (t.taskOwner) userIds.add(t.taskOwner);
+            if (t.taskAssignee) userIds.add(t.taskAssignee);
+          });
+        });
+        const map = await fetchProfiles([...userIds]);
+        setProfilesMap(map);
+        const list = await listProfiles();
+        setAllProfiles(list);
       } finally {
         if (showLoading) setLoading(false);
       }
     };
     fetchData();
-  }, []);
+  }, [currentProjectId, setProjects, setCurrentProjectId, navigate]);
 
   useEffect(() => {
     const handleFocus = () => {
@@ -99,6 +124,29 @@ export default function PackagesPage() {
       await savePackage(updatedPackage);
     } catch (error) {
       alert('Error updating status: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      setPackages(packages);
+    }
+  };
+
+  const handleTaskOwnerAssigneeChange = async (
+    pkg: Package,
+    taskId: string,
+    field: 'taskOwner' | 'taskAssignee',
+    userId: string
+  ) => {
+    const updatedTasks = pkg.tasks.map(t =>
+      t.id === taskId ? { ...t, [field]: userId || undefined } : t
+    );
+    const updatedPackage = { ...pkg, tasks: updatedTasks };
+    setPackages(packages.map(p => (p.id === pkg.id ? updatedPackage : p)));
+    try {
+      await savePackage(updatedPackage);
+      if (userId && !profilesMap.has(userId)) {
+        const map = await fetchProfiles([userId]);
+        setProfilesMap(prev => new Map([...prev, ...map]));
+      }
+    } catch (error) {
+      alert('Error updating task: ' + (error instanceof Error ? error.message : 'Unknown error'));
       setPackages(packages);
     }
   };
@@ -267,6 +315,25 @@ export default function PackagesPage() {
                                 </p>
                               ) : (
                                 <div>
+                                  <div
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '0.5rem',
+                                      padding: '0.25rem 0.5rem',
+                                      fontSize: '0.65rem',
+                                      fontWeight: 600,
+                                      color: '#6b7280',
+                                      marginBottom: '0.25rem',
+                                      borderBottom: '1px solid #e5e7eb',
+                                    }}
+                                  >
+                                    <div style={{ flex: 1, minWidth: 0 }}>Task</div>
+                                    <div style={{ width: '52px' }}>Owner</div>
+                                    <div style={{ width: '52px' }}>Assignee</div>
+                                    <div style={{ width: '110px' }}>Status</div>
+                                    <div style={{ width: '80px' }}>Due</div>
+                                  </div>
                                   {tasksByCategory.map(({ category, tasks }) => (
                                     <div key={category.id} style={{ marginBottom: '1rem' }}>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginBottom: '0.5rem' }}>
@@ -312,6 +379,7 @@ export default function PackagesPage() {
                                                   height: '14px',
                                                   cursor: 'default',
                                                   margin: 0,
+                                                  flexShrink: 0,
                                                 }}
                                               />
                                               <div style={{ flex: 1, minWidth: 0 }}>
@@ -325,8 +393,34 @@ export default function PackagesPage() {
                                                 )}
                                               </div>
                                               <div
+                                                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', width: '52px', flexShrink: 0 }}
+                                                onClick={(e) => e.stopPropagation()}
+                                              >
+                                                <TaskUserAvatarPicker
+                                                  userId={task.taskOwner}
+                                                  profile={task.taskOwner ? profilesMap.get(task.taskOwner) : undefined}
+                                                  allProfiles={allProfiles}
+                                                  onChange={(id) => handleTaskOwnerAssigneeChange(pkg, task.id, 'taskOwner', id)}
+                                                  fieldLabel="Owner"
+                                                  size={24}
+                                                />
+                                              </div>
+                                              <div
+                                                style={{ width: '52px', flexShrink: 0 }}
+                                                onClick={(e) => e.stopPropagation()}
+                                              >
+                                                <TaskUserAvatarPicker
+                                                  userId={task.taskAssignee}
+                                                  profile={task.taskAssignee ? profilesMap.get(task.taskAssignee) : undefined}
+                                                  allProfiles={allProfiles}
+                                                  onChange={(id) => handleTaskOwnerAssigneeChange(pkg, task.id, 'taskAssignee', id)}
+                                                  fieldLabel="Assignee"
+                                                  size={24}
+                                                />
+                                              </div>
+                                              <div
                                                 ref={openStatusTaskId === task.id ? statusDropdownRef : undefined}
-                                                style={{ position: 'relative' }}
+                                                style={{ position: 'relative', flexShrink: 0 }}
                                                 onClick={(e) => e.stopPropagation()}
                                               >
                                                 <button

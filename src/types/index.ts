@@ -30,10 +30,18 @@ export interface Task {
   taskAssignee?: string;
 }
 
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt: string;
+}
+
 export interface Template {
   id: string;
   name: string;
   description?: string;
+  projectId?: string;
   categories: Category[];
   tasks: Task[];
   createdAt: string;
@@ -43,6 +51,7 @@ export interface Package {
   id: string;
   name: string;
   description?: string;
+  projectId?: string;
   templateId: string;
   expectedStartDate: string;
   tasks: Task[];
@@ -51,6 +60,7 @@ export interface Package {
 }
 
 export interface AppData {
+  projects: Project[];
   templates: Template[];
   packages: Package[];
 }

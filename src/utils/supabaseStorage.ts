@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { AppData, Template, Package, Category, Task, DEFAULT_TASK_STATUS } from '../types';
+import { AppData, Project, Template, Package, Category, Task, DEFAULT_TASK_STATUS } from '../types';
 
 const getCurrentUserId = async (): Promise<string | null> => {
   if (!supabase) return null;
@@ -16,6 +16,14 @@ export const loadData = async (): Promise<AppData> => {
   }
   
   try {
+    // Load projects
+    const { data: projects, error: projectsError } = await supabase
+      .from('projects')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (projectsError) throw projectsError;
+
     // Load templates with their categories and tasks
     const { data: templates, error: templatesError } = await supabase
       .from('templates')
@@ -94,6 +102,7 @@ export const loadData = async (): Promise<AppData> => {
         id: template.id,
         name: template.name,
         description: template.description || undefined,
+        projectId: template.project_id || undefined,
         categories,
         tasks,
         createdAt: new Date(template.created_at).toISOString(),
@@ -130,6 +139,7 @@ export const loadData = async (): Promise<AppData> => {
         id: pkg.id,
         name: pkg.name,
         description: pkg.description || undefined,
+        projectId: pkg.project_id || undefined,
         templateId: pkg.template_id,
         expectedStartDate: pkg.expected_start_date,
         categories,
@@ -138,14 +148,50 @@ export const loadData = async (): Promise<AppData> => {
       };
     });
 
+    const transformedProjects: Project[] = (projects || []).map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      description: p.description || undefined,
+      createdAt: new Date(p.created_at).toISOString(),
+    }));
+
     return {
+      projects: transformedProjects,
       templates: transformedTemplates,
       packages: transformedPackages,
     };
   } catch (error) {
     console.error('Error loading data from Supabase:', error);
-    return { templates: [], packages: [] };
+    return { projects: [], templates: [], packages: [] };
   }
+};
+
+/**
+ * Save a project to Supabase
+ */
+export const saveProject = async (project: Project): Promise<void> => {
+  if (!supabase) throw new Error('Supabase is not configured');
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error('You must be signed in to save projects');
+  const { error } = await supabase
+    .from('projects')
+    .upsert({
+      id: project.id,
+      name: project.name.trim(),
+      description: project.description?.trim() || null,
+      created_at: project.createdAt,
+      user_id: userId,
+    });
+  if (error) throw error;
+};
+
+/**
+ * Delete a project from Supabase (packages/templates will need to be reassigned or deleted)
+ */
+export const deleteProject = async (projectId: string): Promise<void> => {
+  if (!supabase) throw new Error('Supabase is not configured');
+  const { error } = await supabase.from('projects').delete().eq('id', projectId);
+  if (error) throw error;
 };
 
 /**
@@ -169,6 +215,7 @@ export const saveTemplate = async (template: Template): Promise<void> => {
         description: template.description || null,
         created_at: template.createdAt,
         user_id: userId,
+        project_id: template.projectId || null,
       });
 
     if (templateError) throw templateError;
@@ -277,6 +324,7 @@ export const savePackage = async (pkg: Package): Promise<void> => {
         expected_start_date: pkg.expectedStartDate,
         created_at: pkg.createdAt,
         user_id: userId,
+        project_id: pkg.projectId || null,
       });
 
     if (packageError) throw packageError;

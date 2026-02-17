@@ -9,12 +9,14 @@ import type { Profile } from '../utils/profileService';
 import LoadingBulldozer from '../components/LoadingBulldozer';
 import TaskUserAvatar from '../components/TaskUserAvatar';
 import TaskUserAvatarPicker from '../components/TaskUserAvatarPicker';
+import { useProject } from '../contexts/ProjectContext';
 
 const DEFAULT_TASK_USER_ID = 'df028814-9102-417a-b106-b6e5e25c27b1';
 
 export default function PackageDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { currentProjectId } = useProject();
   const isNew = id === 'new';
   
   const [pkg, setPackage] = useState<Package | null>(null);
@@ -36,15 +38,18 @@ export default function PackageDetailPage() {
       setLoading(true);
       try {
         const data = await loadData();
-        setTemplates(data.templates);
+        const projectTemplates = currentProjectId
+          ? data.templates.filter((t: Template) => t.projectId === currentProjectId)
+          : data.templates;
+        setTemplates(projectTemplates);
 
         if (isNew) {
-          // Initialize new package
           const initialDate = new Date().toISOString().split('T')[0];
           setPackage({
             id: `pkg-${Date.now()}`,
             name: '',
             description: '',
+            projectId: currentProjectId || undefined,
             templateId: '',
             expectedStartDate: initialDate,
             tasks: [],
@@ -81,7 +86,7 @@ export default function PackageDetailPage() {
       }
     };
     fetchData();
-  }, [id, isNew, navigate]);
+  }, [id, isNew, navigate, currentProjectId]);
 
   const calculateDueDate = (expectedStartDate: string, leadReviewTime?: number): string => {
     if (leadReviewTime !== undefined && leadReviewTime > 0) {
@@ -177,6 +182,7 @@ export default function PackageDetailPage() {
         id: pkg?.id || `pkg-${Date.now()}`,
         name: pkg?.name || '',
         description: pkg?.description || '',
+        projectId: currentProjectId || pkg?.projectId,
         templateId,
         expectedStartDate,
         tasks: newTasks,

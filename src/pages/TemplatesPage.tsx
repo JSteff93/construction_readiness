@@ -1,29 +1,38 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Template } from '../types';
 import { loadData, deleteTemplate, saveTemplate } from '../utils/storage';
 import LoadingBulldozer from '../components/LoadingBulldozer';
 import { formatDate } from '../utils/dateUtils';
 import { downloadTemplateAsExcel, downloadBlankTemplate, parseExcelToTemplate } from '../utils/excelUtils';
+import { useProject } from '../contexts/ProjectContext';
 
 export default function TemplatesPage() {
+  const { currentProjectId, setProjects, setCurrentProjectId } = useProject();
+  const navigate = useNavigate();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [loading, setLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (!currentProjectId) {
+      navigate('/projects', { replace: true });
+      return;
+    }
     const fetchData = async () => {
       setLoading(true);
       try {
         const data = await loadData();
-        setTemplates(data.templates);
+        setProjects(data.projects || []);
+        const filtered = data.templates.filter((t: Template) => t.projectId === currentProjectId);
+        setTemplates(filtered);
       } finally {
         setLoading(false);
       }
     };
     fetchData();
-  }, []);
+  }, [currentProjectId, setProjects, setCurrentProjectId, navigate]);
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this template? This will also delete all packages using this template.')) {
@@ -82,6 +91,7 @@ export default function TemplatesPage() {
         }
       }
 
+      template.projectId = currentProjectId;
       await saveTemplate(template);
       setTemplates([...templates, template]);
       alert(`Template "${template.name}" imported successfully!`);

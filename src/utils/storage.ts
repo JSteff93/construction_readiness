@@ -1,8 +1,10 @@
-import { AppData, Template, Package, Task } from '../types';
+import { AppData, Project, Template, Package, Task } from '../types';
 import * as supabaseStorage from './supabaseStorage';
+import { generateId } from './idGenerator';
 
 const STORAGE_KEY = 'construction-readiness-data';
 const MIGRATE_JAMES_FLAG = 'construction-readiness-migrated-task-owners-james';
+const MIGRATE_PROJECTS_FLAG = 'construction-readiness-migrated-projects';
 const DEFAULT_TASK_USER_ID = 'df028814-9102-417a-b106-b6e5e25c27b1';
 
 // One-time migration: set all existing tasks' owner and assignee to default user_id
@@ -20,7 +22,7 @@ const migrateTaskOwnersToJames = (data: AppData): AppData => {
     tasks: p.tasks.map(updateTask),
   }));
 
-  const migrated = { templates, packages };
+  const migrated = { projects: data.projects || [], templates, packages };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
     localStorage.setItem(MIGRATE_JAMES_FLAG, 'true');
@@ -28,6 +30,32 @@ const migrateTaskOwnersToJames = (data: AppData): AppData => {
     console.error('Migration save failed:', e);
   }
   return migrated;
+};
+
+// One-time migration: add default project LGCFR and assign all packages/templates to it
+const migrateProjects = (data: AppData): AppData => {
+  if (localStorage.getItem(MIGRATE_PROJECTS_FLAG) === 'true') return data;
+  let projects = data.projects || [];
+  if (projects.length === 0) {
+    const lgcfr: Project = {
+      id: generateId(),
+      name: 'LGCFR',
+      description: 'Default project',
+      createdAt: new Date().toISOString(),
+    };
+    projects = [lgcfr];
+    const templates = data.templates.map(t => ({ ...t, projectId: lgcfr.id }));
+    const packages = data.packages.map(p => ({ ...p, projectId: lgcfr.id }));
+    const migrated = { projects, templates, packages };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+      localStorage.setItem(MIGRATE_PROJECTS_FLAG, 'true');
+    } catch (e) {
+      console.error('Projects migration save failed:', e);
+    }
+    return migrated;
+  }
+  return data;
 };
 
 // Check if Supabase is configured
@@ -42,18 +70,25 @@ const loadDataLocal = (): AppData => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      const data = JSON.parse(raw) as AppData;
-      return migrateTaskOwnersToJames(data);
+      let data = JSON.parse(raw) as AppData;
+      if (!data.projects) data = { ...data, projects: [] };
+      data = migrateTaskOwnersToJames(data);
+      data = migrateProjects(data);
+      return data;
     }
   } catch (error) {
     console.error('Error loading data from storage:', error);
   }
-  return { templates: [], packages: [] };
+  return { projects: [], templates: [], packages: [] };
 };
 
 const saveDataLocal = (data: AppData): void => {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      projects: data.projects || [],
+      templates: data.templates,
+      packages: data.packages,
+    }));
   } catch (error) {
     console.error('Error saving data to storage:', error);
   }
@@ -94,6 +129,22 @@ const deletePackageLocal = (packageId: string): void => {
   saveDataLocal(data);
 };
 
+const saveProjectLocal = (project: Project): void => {
+  const data = loadDataLocal();
+  const projects = data.projects || [];
+  const index = projects.findIndex(p => p.id === project.id);
+  const next = index >= 0 ? projects.map((p, i) => (i === index ? project : p)) : [...projects, project];
+  saveDataLocal({ ...data, projects: next });
+};
+
+const deleteProjectLocal = (projectId: string): void => {
+  const data = loadDataLocal();
+  data.projects = (data.projects || []).filter(p => p.id !== projectId);
+  data.packages = data.packages.filter(p => p.projectId !== projectId);
+  data.templates = data.templates.filter(t => t.projectId !== projectId);
+  saveDataLocal(data);
+};
+
 // Main exported functions - use Supabase if configured, otherwise fallback to localStorage
 export const loadData = async (): Promise<AppData> => {
   if (isSupabaseConfigured()) {
@@ -110,7 +161,9 @@ export const loadData = async (): Promise<AppData> => {
 export const saveData = async (data: AppData): Promise<void> => {
   if (isSupabaseConfigured()) {
     try {
-      // Save all templates and packages
+      for (const project of data.projects || []) {
+        await supabaseStorage.saveProject(project);
+      }
       for (const template of data.templates) {
         await supabaseStorage.saveTemplate(template);
       }
@@ -123,6 +176,32 @@ export const saveData = async (data: AppData): Promise<void> => {
     }
   } else {
     saveDataLocal(data);
+  }
+};
+
+export const saveProject = async (project: Project): Promise<void> => {
+  if (isSupabaseConfigured()) {
+    try {
+      await supabaseStorage.saveProject(project);
+    } catch (error) {
+      console.error('Error saving project to Supabase, falling back to localStorage:', error);
+      saveProjectLocal(project);
+    }
+  } else {
+    saveProjectLocal(project);
+  }
+};
+
+export const deleteProject = async (projectId: string): Promise<void> => {
+  if (isSupabaseConfigured()) {
+    try {
+      await supabaseStorage.deleteProject(projectId);
+    } catch (error) {
+      console.error('Error deleting project from Supabase, falling back to localStorage:', error);
+      deleteProjectLocal(projectId);
+    }
+  } else {
+    deleteProjectLocal(projectId);
   }
 };
 

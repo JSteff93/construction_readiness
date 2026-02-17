@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Package, Task, TaskStatus, TASK_STATUSES, DEFAULT_TASK_STATUS } from '../types';
 import { loadData, savePackage } from '../utils/storage';
 import LoadingBulldozer from '../components/LoadingBulldozer';
@@ -7,6 +7,7 @@ import { formatDateShort } from '../utils/dateUtils';
 import { fetchProfiles, listProfiles } from '../utils/profileService';
 import type { Profile } from '../utils/profileService';
 import TaskUserAvatarPicker from '../components/TaskUserAvatarPicker';
+import { useProject } from '../contexts/ProjectContext';
 
 const STATUS_COLORS: Record<TaskStatus, { bg: string; border: string; text: string }> = {
   Pending: { bg: '#f1f5f9', border: '#94a3b8', text: '#475569' },
@@ -29,6 +30,8 @@ type SortDirection = 'asc' | 'desc';
 type ViewMode = 'list' | 'board';
 
 export default function TasksPage() {
+  const { currentProjectId, setProjects } = useProject();
+  const navigate = useNavigate();
   const [packages, setPackages] = useState<Package[]>([]);
   const [tasks, setTasks] = useState<TaskWithPackage[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -97,10 +100,14 @@ export default function TasksPage() {
     if (showLoading) setLoading(true);
     try {
       const data = await loadData();
-      setPackages(data.packages);
+      setProjects(data.projects || []);
+      const projectPackages = currentProjectId
+        ? data.packages.filter((p: Package) => p.projectId === currentProjectId)
+        : data.packages;
+      setPackages(projectPackages);
 
       const allTasks: TaskWithPackage[] = [];
-      data.packages.forEach(pkg => {
+      projectPackages.forEach((pkg: Package) => {
         pkg.tasks.forEach(task => {
           const category = pkg.categories.find(c => c.id === task.categoryId);
           allTasks.push({
@@ -131,8 +138,12 @@ export default function TasksPage() {
   };
 
   useEffect(() => {
+    if (!currentProjectId) {
+      navigate('/projects', { replace: true });
+      return;
+    }
     loadTasks();
-  }, []);
+  }, [currentProjectId, navigate]);
 
   const getTaskStatus = (task: { status?: TaskStatus }) =>
     task.status && TASK_STATUSES.includes(task.status) ? task.status : DEFAULT_TASK_STATUS;
