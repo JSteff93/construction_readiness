@@ -4,6 +4,9 @@ import { Package, Task, TaskStatus, TASK_STATUSES, DEFAULT_TASK_STATUS } from '.
 import { loadData, savePackage } from '../utils/storage';
 import LoadingBulldozer from '../components/LoadingBulldozer';
 import { formatDateShort } from '../utils/dateUtils';
+import { fetchProfiles, listProfiles } from '../utils/profileService';
+import type { Profile } from '../utils/profileService';
+import TaskUserAvatarPicker from '../components/TaskUserAvatarPicker';
 
 const STATUS_COLORS: Record<TaskStatus, { bg: string; border: string; text: string }> = {
   Pending: { bg: '#f1f5f9', border: '#94a3b8', text: '#475569' },
@@ -42,6 +45,8 @@ export default function TasksPage() {
   const [boardDrawerOpen, setBoardDrawerOpen] = useState(false);
   const [editingDueDateKey, setEditingDueDateKey] = useState<string | null>(null);
   const [openFilterColumn, setOpenFilterColumn] = useState<'package' | 'category' | 'status' | null>(null);
+  const [profilesMap, setProfilesMap] = useState<Map<string, Profile>>(new Map());
+  const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const filterDropdownRef = useRef<HTMLDivElement>(null);
   const boardJustDraggedRef = useRef(false);
@@ -110,6 +115,16 @@ export default function TasksPage() {
       });
 
       setTasks(allTasks);
+
+      const userIds = new Set<string>();
+      allTasks.forEach(t => {
+        if (t.taskOwner) userIds.add(t.taskOwner);
+        if (t.taskAssignee) userIds.add(t.taskAssignee);
+      });
+      const map = await fetchProfiles([...userIds]);
+      setProfilesMap(map);
+      const list = await listProfiles();
+      setAllProfiles(list);
     } finally {
       if (showLoading) setLoading(false);
     }
@@ -620,39 +635,31 @@ export default function TasksPage() {
                   <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#14532d', marginBottom: '0.35rem' }}>
                     Task Owner
                   </label>
-                  <input
-                    type="text"
-                    value={task.taskOwner || ''}
-                    onChange={(e) => handleTaskOwnerAssigneeChange(task, 'taskOwner', e.target.value)}
-                    onBlur={(e) => handleTaskOwnerAssigneeChange(task, 'taskOwner', e.target.value.trim())}
-                    placeholder="Enter owner"
-                    style={{
-                      width: '100%',
-                      padding: '0.5rem 0.75rem',
-                      fontSize: '0.875rem',
-                      border: '2px solid #bbf7d0',
-                      borderRadius: '6px',
-                    }}
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <TaskUserAvatarPicker
+                      userId={task.taskOwner}
+                      profile={task.taskOwner ? profilesMap.get(task.taskOwner) : undefined}
+                      allProfiles={allProfiles}
+                      onChange={(id) => handleTaskOwnerAssigneeChange(task, 'taskOwner', id)}
+                      fieldLabel="Owner"
+                      size={28}
+                    />
+                  </div>
                 </div>
                 <div style={{ marginBottom: '1rem' }}>
                   <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#14532d', marginBottom: '0.35rem' }}>
                     Task Assignee
                   </label>
-                  <input
-                    type="text"
-                    value={task.taskAssignee || ''}
-                    onChange={(e) => handleTaskOwnerAssigneeChange(task, 'taskAssignee', e.target.value)}
-                    onBlur={(e) => handleTaskOwnerAssigneeChange(task, 'taskAssignee', e.target.value.trim())}
-                    placeholder="Enter assignee"
-                    style={{
-                      width: '100%',
-                      padding: '0.5rem 0.75rem',
-                      fontSize: '0.875rem',
-                      border: '2px solid #bbf7d0',
-                      borderRadius: '6px',
-                    }}
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <TaskUserAvatarPicker
+                      userId={task.taskAssignee}
+                      profile={task.taskAssignee ? profilesMap.get(task.taskAssignee) : undefined}
+                      allProfiles={allProfiles}
+                      onChange={(id) => handleTaskOwnerAssigneeChange(task, 'taskAssignee', id)}
+                      fieldLabel="Assignee"
+                      size={28}
+                    />
+                  </div>
                 </div>
                 {task.leadReviewTime != null && task.leadReviewTime > 0 && (
                   <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
@@ -1229,10 +1236,24 @@ export default function TasksPage() {
                           : '-'}
                       </td>
                       <td style={{ padding: '1rem', color: '#6b7280', fontSize: '0.875rem' }}>
-                        {task.taskOwner || '-'}
+                        <TaskUserAvatarPicker
+                          userId={task.taskOwner}
+                          profile={task.taskOwner ? profilesMap.get(task.taskOwner) : undefined}
+                          allProfiles={allProfiles}
+                          onChange={(id) => handleTaskOwnerAssigneeChange(task, 'taskOwner', id)}
+                          fieldLabel="Owner"
+                          size={28}
+                        />
                       </td>
                       <td style={{ padding: '1rem', color: '#6b7280', fontSize: '0.875rem' }}>
-                        {task.taskAssignee || '-'}
+                        <TaskUserAvatarPicker
+                          userId={task.taskAssignee}
+                          profile={task.taskAssignee ? profilesMap.get(task.taskAssignee) : undefined}
+                          allProfiles={allProfiles}
+                          onChange={(id) => handleTaskOwnerAssigneeChange(task, 'taskAssignee', id)}
+                          fieldLabel="Assignee"
+                          size={28}
+                        />
                       </td>
                       <td style={{ padding: '1rem' }}>
                         <span

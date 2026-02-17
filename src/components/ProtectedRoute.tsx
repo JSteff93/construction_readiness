@@ -1,11 +1,13 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useProfile } from '../contexts/ProfileContext';
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, authRequired } = useAuth();
+  const { profile, loading: profileLoading } = useProfile();
   const location = useLocation();
 
-  if (loading) {
+  if (loading || (authRequired && user && profileLoading)) {
     return (
       <div
         style={{
@@ -28,6 +30,11 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
 
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // First-time login: no profile yet → redirect to create profile
+  if (!profile) {
+    return <Navigate to="/profile/create" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;

@@ -4,8 +4,14 @@ import { Template, Category, Task, Package, DEFAULT_TASK_STATUS } from '../types
 import { loadData, saveTemplate, savePackage } from '../utils/storage';
 import { generateId } from '../utils/idGenerator';
 import { findNewTasks, addNewTasksToPackage } from '../utils/packageUtils';
+import { fetchProfiles, listProfiles } from '../utils/profileService';
+import type { Profile } from '../utils/profileService';
 import PackageSelectionModal from '../components/PackageSelectionModal';
 import LoadingBulldozer from '../components/LoadingBulldozer';
+import TaskUserAvatar from '../components/TaskUserAvatar';
+import TaskUserAvatarPicker from '../components/TaskUserAvatarPicker';
+
+const DEFAULT_TASK_USER_ID = 'df028814-9102-417a-b106-b6e5e25c27b1';
 
 const CATEGORY_COLORS = [
   '#14532d', '#166534', '#15803d', '#16a34a', '#22c55e',
@@ -40,6 +46,8 @@ export default function TemplateDetailPage() {
   const [selectedPackageIds, setSelectedPackageIds] = useState<Set<string>>(new Set());
   const [newTasksToAdd, setNewTasksToAdd] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [profilesMap, setProfilesMap] = useState<Map<string, Profile>>(new Map());
+  const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -64,6 +72,15 @@ export default function TemplateDetailPage() {
             navigate('/templates');
           }
         }
+        const userIds = new Set<string>();
+        (data.templates || []).forEach(t => t.tasks.forEach(task => {
+          if (task.taskOwner) userIds.add(task.taskOwner);
+          if (task.taskAssignee) userIds.add(task.taskAssignee);
+        }));
+        const map = await fetchProfiles([...userIds]);
+        setProfilesMap(map);
+        const list = await listProfiles();
+        setAllProfiles(list);
       } finally {
         setLoading(false);
       }
@@ -203,8 +220,8 @@ export default function TemplateDetailPage() {
       completed: false,
       leadReviewTime,
       status: DEFAULT_TASK_STATUS,
-      taskOwner: newTaskOwner.trim() || undefined,
-      taskAssignee: newTaskAssignee.trim() || undefined,
+      taskOwner: (newTaskOwner.trim() || DEFAULT_TASK_USER_ID) || undefined,
+      taskAssignee: (newTaskAssignee.trim() || DEFAULT_TASK_USER_ID) || undefined,
     };
     
     setTemplate({
@@ -536,23 +553,29 @@ export default function TemplateDetailPage() {
                         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                           <div className="form-group" style={{ marginBottom: '1rem', flex: '1 1 140px' }}>
                             <label className="form-label">Task Owner</label>
-                            <input
-                              type="text"
-                              className="form-input"
-                              placeholder="Optional"
+                            <select
+                              className="form-select"
                               value={newTaskOwner}
                               onChange={(e) => setNewTaskOwner(e.target.value)}
-                            />
+                            >
+                              <option value="">—</option>
+                              {allProfiles.map(p => (
+                                <option key={p.userId} value={p.userId}>{p.firstName} {p.lastName}</option>
+                              ))}
+                            </select>
                           </div>
                           <div className="form-group" style={{ marginBottom: '1rem', flex: '1 1 140px' }}>
                             <label className="form-label">Task Assignee</label>
-                            <input
-                              type="text"
-                              className="form-input"
-                              placeholder="Optional"
+                            <select
+                              className="form-select"
                               value={newTaskAssignee}
                               onChange={(e) => setNewTaskAssignee(e.target.value)}
-                            />
+                            >
+                              <option value="">—</option>
+                              {allProfiles.map(p => (
+                                <option key={p.userId} value={p.userId}>{p.firstName} {p.lastName}</option>
+                              ))}
+                            </select>
                           </div>
                         </div>
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
@@ -580,13 +603,31 @@ export default function TemplateDetailPage() {
                               Lead/Review Time: {task.leadReviewTime} day{task.leadReviewTime !== 1 ? 's' : ''}
                             </div>
                           )}
-                          {(task.taskOwner || task.taskAssignee) && (
-                            <div style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                              {task.taskOwner && <span>Owner: {task.taskOwner}</span>}
-                              {task.taskOwner && task.taskAssignee && ' · '}
-                              {task.taskAssignee && <span>Assignee: {task.taskAssignee}</span>}
-                            </div>
-                          )}
+                          <div style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <TaskUserAvatarPicker
+                                userId={task.taskOwner}
+                                profile={profilesMap.get(task.taskOwner)}
+                                allProfiles={allProfiles}
+                                onChange={(id) => handleUpdateTask(task.id, { taskOwner: id || undefined })}
+                                fieldLabel="Owner"
+                                size={22}
+                              />
+                              <span>Owner</span>
+                            </span>
+                            {task.taskOwner && task.taskAssignee && <span> · </span>}
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <TaskUserAvatarPicker
+                                userId={task.taskAssignee}
+                                profile={profilesMap.get(task.taskAssignee)}
+                                allProfiles={allProfiles}
+                                onChange={(id) => handleUpdateTask(task.id, { taskAssignee: id || undefined })}
+                                fieldLabel="Assignee"
+                                size={22}
+                              />
+                              <span>Assignee</span>
+                            </span>
+                          </div>
                         </div>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           <button
@@ -648,23 +689,29 @@ export default function TemplateDetailPage() {
                       <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                         <div className="form-group" style={{ marginBottom: '1rem', flex: '1 1 140px' }}>
                           <label className="form-label">Task Owner</label>
-                          <input
-                            type="text"
-                            className="form-input"
-                            placeholder="Optional"
-                            value={newTaskOwner}
+                          <select
+                            className="form-select"
+                            value={newTaskOwner || DEFAULT_TASK_USER_ID}
                             onChange={(e) => setNewTaskOwner(e.target.value)}
-                          />
+                          >
+                            <option value="">—</option>
+                            {allProfiles.map(p => (
+                              <option key={p.userId} value={p.userId}>{p.firstName} {p.lastName}</option>
+                            ))}
+                          </select>
                         </div>
                         <div className="form-group" style={{ marginBottom: '1rem', flex: '1 1 140px' }}>
                           <label className="form-label">Task Assignee</label>
-                          <input
-                            type="text"
-                            className="form-input"
-                            placeholder="Optional"
-                            value={newTaskAssignee}
+                          <select
+                            className="form-select"
+                            value={newTaskAssignee || DEFAULT_TASK_USER_ID}
                             onChange={(e) => setNewTaskAssignee(e.target.value)}
-                          />
+                          >
+                            <option value="">—</option>
+                            {allProfiles.map(p => (
+                              <option key={p.userId} value={p.userId}>{p.firstName} {p.lastName}</option>
+                            ))}
+                          </select>
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>

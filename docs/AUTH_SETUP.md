@@ -35,15 +35,23 @@ This app supports Google and GitHub OAuth. Follow these steps to enable sign-in.
 3. **Authorization callback URL**: `https://<your-project-ref>.supabase.co/auth/v1/callback`
 4. Copy Client ID and Client Secret into Supabase → Auth → Providers → GitHub
 
-## 5. Apply Database Migration
+## 5. Apply Database Migrations
 
 ```bash
 supabase db push
 ```
 
-Or run the migration `005_add_user_auth_rls.sql` from the Supabase SQL Editor.
+Or run migrations from the Supabase SQL Editor in order: `005_add_user_auth_rls.sql`, `006_create_profiles_table.sql`.
 
-## 6. Assign Existing Data (optional)
+## 6. First-Time Profile Setup
+
+On first login, users are prompted to create a profile with:
+- First name (required)
+- Last name (required)
+- Role (required)
+- Company (optional)
+
+## 7. Assign Existing Data (optional)
 
 If you had data before enabling auth, assign it to your user:
 

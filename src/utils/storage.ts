@@ -3,12 +3,13 @@ import * as supabaseStorage from './supabaseStorage';
 
 const STORAGE_KEY = 'construction-readiness-data';
 const MIGRATE_JAMES_FLAG = 'construction-readiness-migrated-task-owners-james';
+const DEFAULT_TASK_USER_ID = 'df028814-9102-417a-b106-b6e5e25c27b1';
 
-// One-time migration: set all existing tasks' owner and assignee to "James"
+// One-time migration: set all existing tasks' owner and assignee to default user_id
 const migrateTaskOwnersToJames = (data: AppData): AppData => {
   if (localStorage.getItem(MIGRATE_JAMES_FLAG) === 'true') return data;
 
-  const updateTask = (t: Task): Task => ({ ...t, taskOwner: 'James', taskAssignee: 'James' });
+  const updateTask = (t: Task): Task => ({ ...t, taskOwner: DEFAULT_TASK_USER_ID, taskAssignee: DEFAULT_TASK_USER_ID });
 
   const templates = data.templates.map(t => ({
     ...t,

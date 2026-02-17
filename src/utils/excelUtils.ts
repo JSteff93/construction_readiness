@@ -192,8 +192,10 @@ export const parseExcelToTemplate = (file: File): Promise<Template> => {
           const description = descriptionIndex >= 0 ? String(row[descriptionIndex] || '').trim() : '';
           const leadTimeStr = leadTimeIndex >= 0 ? String(row[leadTimeIndex] || '').trim() : '';
           const leadTime = leadTimeStr ? parseInt(leadTimeStr, 10) : undefined;
-          const taskOwner = taskOwnerIndex >= 0 ? String(row[taskOwnerIndex] || '').trim() : '';
-          const taskAssignee = taskAssigneeIndex >= 0 ? String(row[taskAssigneeIndex] || '').trim() : '';
+          // Task owner/assignee are now user_id (UUID). Default to the standard user when column has a value.
+          const DEFAULT_TASK_USER_ID = 'df028814-9102-417a-b106-b6e5e25c27b1';
+          const hasOwner = taskOwnerIndex >= 0 && String(row[taskOwnerIndex] || '').trim() !== '';
+          const hasAssignee = taskAssigneeIndex >= 0 && String(row[taskAssigneeIndex] || '').trim() !== '';
 
           const task: Task = {
             id: generateId(),
@@ -203,8 +205,8 @@ export const parseExcelToTemplate = (file: File): Promise<Template> => {
             completed: false,
             leadReviewTime: leadTime && !isNaN(leadTime) ? leadTime : undefined,
             status: DEFAULT_TASK_STATUS,
-            taskOwner: taskOwner || undefined,
-            taskAssignee: taskAssignee || undefined,
+            taskOwner: hasOwner ? DEFAULT_TASK_USER_ID : undefined,
+            taskAssignee: hasAssignee ? DEFAULT_TASK_USER_ID : undefined,
           };
 
           tasks.push(task);

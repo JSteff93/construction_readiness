@@ -4,7 +4,13 @@ import { Package, Template, Task, DEFAULT_TASK_STATUS } from '../types';
 import { loadData, savePackage } from '../utils/storage';
 import { getCountdownText, getCountdownColor, formatDate } from '../utils/dateUtils';
 import { generateId } from '../utils/idGenerator';
+import { fetchProfiles, listProfiles } from '../utils/profileService';
+import type { Profile } from '../utils/profileService';
 import LoadingBulldozer from '../components/LoadingBulldozer';
+import TaskUserAvatar from '../components/TaskUserAvatar';
+import TaskUserAvatarPicker from '../components/TaskUserAvatarPicker';
+
+const DEFAULT_TASK_USER_ID = 'df028814-9102-417a-b106-b6e5e25c27b1';
 
 export default function PackageDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -22,6 +28,8 @@ export default function PackageDetailPage() {
   const [newTaskAssignee, setNewTaskAssignee] = useState<string>('');
   const [previousExpectedStartDate, setPreviousExpectedStartDate] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [profilesMap, setProfilesMap] = useState<Map<string, Profile>>(new Map());
+  const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -59,6 +67,15 @@ export default function PackageDetailPage() {
             navigate('/');
           }
         }
+        const userIds = new Set<string>();
+        (data.packages || []).forEach(p => p.tasks.forEach(task => {
+          if (task.taskOwner) userIds.add(task.taskOwner);
+          if (task.taskAssignee) userIds.add(task.taskAssignee);
+        }));
+        const map = await fetchProfiles([...userIds]);
+        setProfilesMap(map);
+        const list = await listProfiles();
+        setAllProfiles(list);
       } finally {
         setLoading(false);
       }
@@ -228,8 +245,8 @@ export default function PackageDetailPage() {
       dueDate,
       leadReviewTime,
       status: DEFAULT_TASK_STATUS,
-      taskOwner: newTaskOwner.trim() || undefined,
-      taskAssignee: newTaskAssignee.trim() || undefined,
+      taskOwner: (newTaskOwner.trim() || DEFAULT_TASK_USER_ID) || undefined,
+      taskAssignee: (newTaskAssignee.trim() || DEFAULT_TASK_USER_ID) || undefined,
     };
     
     setPackage({
@@ -274,6 +291,16 @@ export default function PackageDetailPage() {
         }
         return t;
       }),
+    });
+  };
+
+  const handleUpdateTaskOwnerAssignee = (taskId: string, field: 'taskOwner' | 'taskAssignee', userId: string) => {
+    if (!pkg) return;
+    setPackage({
+      ...pkg,
+      tasks: pkg.tasks.map(t =>
+        t.id === taskId ? { ...t, [field]: userId || undefined } : t
+      ),
     });
   };
 
@@ -575,13 +602,31 @@ export default function PackageDetailPage() {
                             </div>
                           </div>
                         </div>
-                        {(task.taskOwner || task.taskAssignee) && (
-                          <div style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                            {task.taskOwner && <span>Owner: {task.taskOwner}</span>}
-                            {task.taskOwner && task.taskAssignee && ' · '}
-                            {task.taskAssignee && <span>Assignee: {task.taskAssignee}</span>}
-                          </div>
-                        )}
+                        <div style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <TaskUserAvatarPicker
+                              userId={task.taskOwner}
+                              profile={profilesMap.get(task.taskOwner)}
+                              allProfiles={allProfiles}
+                              onChange={(id) => handleUpdateTaskOwnerAssignee(task.id, 'taskOwner', id)}
+                              fieldLabel="Owner"
+                              size={22}
+                            />
+                            <span>Owner</span>
+                          </span>
+                          {task.taskOwner && task.taskAssignee && <span> · </span>}
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <TaskUserAvatarPicker
+                              userId={task.taskAssignee}
+                              profile={profilesMap.get(task.taskAssignee)}
+                              allProfiles={allProfiles}
+                              onChange={(id) => handleUpdateTaskOwnerAssignee(task.id, 'taskAssignee', id)}
+                              fieldLabel="Assignee"
+                              size={22}
+                            />
+                            <span>Assignee</span>
+                          </span>
+                        </div>
                         {task.completed && task.completedDate && (
                           <div style={{ fontSize: '0.75rem', color: '#10b981', marginTop: '0.25rem' }}>
                             Completed: {formatDate(task.completedDate)}
@@ -643,23 +688,29 @@ export default function PackageDetailPage() {
                     <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                       <div className="form-group" style={{ marginBottom: '1rem', flex: '1 1 140px' }}>
                         <label className="form-label">Task Owner</label>
-                        <input
-                          type="text"
-                          className="form-input"
-                          placeholder="Optional"
-                          value={newTaskOwner}
+                        <select
+                          className="form-select"
+                          value={newTaskOwner || DEFAULT_TASK_USER_ID}
                           onChange={(e) => setNewTaskOwner(e.target.value)}
-                        />
+                        >
+                          <option value="">—</option>
+                          {allProfiles.map(p => (
+                            <option key={p.userId} value={p.userId}>{p.firstName} {p.lastName}</option>
+                          ))}
+                        </select>
                       </div>
                       <div className="form-group" style={{ marginBottom: '1rem', flex: '1 1 140px' }}>
                         <label className="form-label">Task Assignee</label>
-                        <input
-                          type="text"
-                          className="form-input"
-                          placeholder="Optional"
-                          value={newTaskAssignee}
+                        <select
+                          className="form-select"
+                          value={newTaskAssignee || DEFAULT_TASK_USER_ID}
                           onChange={(e) => setNewTaskAssignee(e.target.value)}
-                        />
+                        >
+                          <option value="">—</option>
+                          {allProfiles.map(p => (
+                            <option key={p.userId} value={p.userId}>{p.firstName} {p.lastName}</option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>

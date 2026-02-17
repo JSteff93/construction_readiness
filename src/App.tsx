@@ -5,13 +5,29 @@ import TemplateDetailPage from './pages/TemplateDetailPage';
 import PackageDetailPage from './pages/PackageDetailPage';
 import TasksPage from './pages/TasksPage';
 import LoginPage from './pages/LoginPage';
+import ProfilePage from './pages/ProfilePage';
 import ProtectedRoute from './components/ProtectedRoute';
+import ProfileSetupRoute from './components/ProfileSetupRoute';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ProfileProvider, useProfile } from './contexts/ProfileContext';
+import { DEFAULT_AVATAR_COLOR } from './utils/profileService';
 import './App.css';
+
+function getInitials(profile: { firstName: string; lastName: string } | null, email: string | undefined): string {
+  if (profile?.firstName && profile?.lastName) {
+    return (profile.firstName[0] + profile.lastName[0]).toUpperCase();
+  }
+  const raw = email || '';
+  const local = raw.split('@')[0] || '';
+  if (local.length >= 2) return local.slice(0, 2).toUpperCase();
+  return local ? local[0].toUpperCase() : '?';
+}
 
 function Navigation() {
   const location = useLocation();
-  const { user, authRequired, signOut } = useAuth();
+  const { user, authRequired } = useAuth();
+  const { profile } = useProfile();
+  const initials = getInitials(profile, user?.email || user?.user_metadata?.email);
 
   return (
     <nav className="navbar">
@@ -37,26 +53,18 @@ function Navigation() {
             Templates
           </Link>
           {authRequired && user && (
-            <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <span style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.9)' }}>
-                {user.email || user.user_metadata?.email || 'Signed in'}
-              </span>
-              <button
-                type="button"
-                onClick={() => signOut()}
-                style={{
-                  padding: '0.35rem 0.75rem',
-                  fontSize: '0.8rem',
-                  border: '1px solid rgba(255,255,255,0.5)',
-                  borderRadius: '6px',
-                  background: 'rgba(255,255,255,0.15)',
-                  color: 'white',
-                  cursor: 'pointer',
-                }}
-              >
-                Sign out
-              </button>
-            </span>
+            <Link
+              to="/profile"
+              className="nav-avatar"
+              title="View profile"
+              aria-label="View profile"
+              style={{
+                marginLeft: 'auto',
+                backgroundColor: profile?.avatarColor || DEFAULT_AVATAR_COLOR,
+              }}
+            >
+              {initials}
+            </Link>
           )}
         </div>
       </div>
@@ -71,6 +79,15 @@ function AppContent() {
       <main className="main-content">
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/profile/create" element={<ProfileSetupRoute />} />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/"
             element={
@@ -122,7 +139,9 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppContent />
+        <ProfileProvider>
+          <AppContent />
+        </ProfileProvider>
       </AuthProvider>
     </BrowserRouter>
   );
